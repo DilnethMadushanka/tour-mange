@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head><body>
+<title>TourFleet Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky top bar with company switch + tabs; one working pane below; editors open as a side sheet. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --sunk:#e8eceb; --line:#d3dad8; --fg:#17201e; --muted:#5b6865;
+  --accent:#0f6b5c; --accent-fg:#ffffff; --accent-soft:#d7ece7; --road:#c4791b;
+  --ok:#1f7a3d; --ok-soft:#dcf1e2; --warn:#9a6200; --warn-soft:#fbecc9; --bad:#b3261e; --bad-soft:#f9dedc;
+  --busy:#2d5f8a; --busy-soft:#d9e6f2;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1514; --surface:#18201f; --sunk:#111917; --line:#2c3836; --fg:#e4ebe9; --muted:#9aa8a5;
+  --accent:#4fbfa8; --accent-fg:#06201b; --accent-soft:#18372f; --road:#e3a14d;
+  --ok:#6fcf8e; --ok-soft:#173523; --warn:#f0bf5a; --warn-soft:#3a2d10; --bad:#f2958c; --bad-soft:#401a17;
+  --busy:#8bb8e0; --busy-soft:#1b2c3d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1514; --surface:#18201f; --sunk:#111917; --line:#2c3836; --fg:#e4ebe9; --muted:#9aa8a5;
+  --accent:#4fbfa8; --accent-fg:#06201b; --accent-soft:#18372f; --road:#e3a14d;
+  --ok:#6fcf8e; --ok-soft:#173523; --warn:#f0bf5a; --warn-soft:#3a2d10; --bad:#f2958c; --bad-soft:#401a17;
+  --busy:#8bb8e0; --busy-soft:#1b2c3d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:20px} h2{font-size:18px} h3{font-size:15px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand svg{flex:none}
+.brand small{display:block;color:var(--muted);font-size:12px;font-family:var(--body);font-weight:400}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;padding-bottom:0}
+nav.tabs a{padding:10px 14px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs a[aria-current="page"]{color:var(--fg);border-color:var(--road)}
+nav.tabs a:hover{color:var(--fg)}
+main{padding-block:20px 60px;display:grid;gap:20px}
+.banner{font-size:13px;padding:8px 12px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.spread{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.stat b{display:block;font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.muted{color:var(--muted)} .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+button,.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 12px;border-radius:6px;cursor:pointer;line-height:1.3}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button.danger{color:var(--bad);border-color:transparent;background:transparent}
+button.danger.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+button.link{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+button.small{padding:4px 8px;font-size:13px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--road);outline-offset:2px}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:60px}
+label.f{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500;min-width:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--sunk)}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.paid{background:var(--ok-soft);color:var(--ok)}
+.chip.partial{background:var(--warn-soft);color:var(--warn)}
+.chip.pending{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.chip.overdue{background:var(--bad-soft);color:var(--bad)}
+.chip.free{background:var(--ok-soft);color:var(--ok)}
+.chip.busy{background:var(--busy-soft);color:var(--busy)}
+.chip.cancel{background:var(--sunk);color:var(--muted);text-decoration:line-through}
+.chip.ex{background:var(--warn-soft);color:var(--warn);font-weight:500}
+.empty{padding:28px;text-align:center;color:var(--muted);display:grid;gap:10px;justify-items:center}
+.list{display:grid;gap:0}
+.list > div{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line)}
+.list > div:last-child{border-bottom:0}
+.plate{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);white-space:nowrap}
+/* timeline */
+.tl{border-collapse:separate;border-spacing:2px;min-width:0;width:auto}
+.tl th,.tl td{border:0;padding:0;background:none}
+.tl th.d{font-family:var(--mono);font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);text-align:center;width:26px;line-height:1.2;padding-bottom:4px}
+.tl th.d.we{color:var(--road)}
+.tl td.v{padding-right:10px;white-space:nowrap;font-size:13px;position:sticky;left:0;background:var(--surface)}
+.tl td.c{width:26px;height:24px;border-radius:3px;background:var(--sunk)}
+.tl td.c.on{background:var(--busy)}
+.tl td.c.on.start{border-top-left-radius:10px;border-bottom-left-radius:10px}
+.tl td.c.on.end{border-top-right-radius:10px;border-bottom-right-radius:10px}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,16,15,.45);z-index:20;display:flex;justify-content:flex-end}
+.sheet{background:var(--bg);width:min(760px,100%);height:100%;overflow-y:auto;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.sheet-head{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:1;flex-wrap:wrap}
+.sheet-body{padding:18px;display:grid;gap:18px}
+.sec{display:grid;gap:12px;align-content:start}
+.sec > .spread h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-family:var(--body);font-weight:600}
+.lines{display:grid;gap:8px}
+.line{display:grid;gap:8px;grid-template-columns:150px 1fr 1fr 1.3fr auto;align-items:end;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.day{display:grid;gap:8px;padding:12px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--road);border-radius:6px}
+.day .dn{font-family:var(--mono);font-size:12px;color:var(--road);font-weight:500}
+.vpick{display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.vpick label{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;font-size:13px}
+.vpick label input{width:auto;margin-top:3px}
+.vpick label.clash{border-color:var(--bad)}
+.warnbox{padding:8px 12px;border-radius:6px;background:var(--bad-soft);color:var(--bad);font-size:13px}
+.sum{display:flex;gap:18px;flex-wrap:wrap;font-size:13px}
+.sum b{font-family:var(--mono);font-weight:500;font-size:15px;display:block}
+/* month calendar */
+.cal{display:grid;gap:12px}
+.cal-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.cal-title{font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:-.01em}
+.cal-title small{font-family:var(--body);font-size:13px;font-weight:400;color:var(--muted);margin-left:8px;letter-spacing:0}
+.cal-nav{display:flex;gap:4px;align-items:center}
+.cal-nav button{min-width:36px}
+.cal-grid{min-width:340px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--sunk);border-bottom:1px solid var(--line)}
+.cal-dow div{padding:6px 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.cal-dow div.we{color:var(--road)}
+.wk{border-bottom:1px solid var(--line);min-height:100px;position:relative}
+.wk .bg{position:absolute;inset:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.wk .bars{position:relative;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding:30px 0 6px;pointer-events:none}
+.wk .bars .bar{pointer-events:auto}
+.wk:last-child{border-bottom:0}
+.cell{border-right:1px solid var(--line);padding:4px 6px;cursor:pointer;min-width:0}
+.cell:nth-child(7){border-right:0}
+@media (max-width:640px){ .wk .bars{padding-top:26px} }
+.cell:hover{background:var(--sunk)}
+.cell.out{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--sunk) 6px 7px)}
+.cell .dn{font-family:var(--mono);font-size:12px;color:var(--muted);display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%}
+.cell.out .dn{opacity:.5}
+.cell.today .dn{background:var(--road);color:#fff;font-weight:500}
+.bar{position:relative;z-index:1;margin:2px 3px;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:500;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:0;text-align:left;
+  background:var(--busy-soft);color:var(--busy);border-left:3px solid var(--busy)}
+.bar.paid{background:var(--ok-soft);color:var(--ok);border-left-color:var(--ok)}
+.bar.partial{background:var(--warn-soft);color:var(--warn);border-left-color:var(--warn)}
+.bar.overdue{background:var(--bad-soft);color:var(--bad);border-left-color:var(--bad)}
+.bar.cont-l{border-top-left-radius:0;border-bottom-left-radius:0;border-left-style:dotted}
+.bar.cont-r{border-top-right-radius:0;border-bottom-right-radius:0}
+.bar:hover{filter:brightness(.96)}
+.bar .veh{opacity:.75;font-weight:400}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.mstats{display:flex;gap:22px;flex-wrap:wrap}
+.mstats div{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.mstats b{display:block;font-family:var(--mono);font-size:17px;font-weight:500;color:var(--fg);text-transform:none;letter-spacing:0}
+@media (max-width:640px){ .wk{min-height:74px} .bar{font-size:10px;padding:1px 4px;margin:1px} .bar .veh{display:none} .cell{padding:2px 3px} .cal-dow div{padding:4px 3px;font-size:10px} }
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;z-index:40;font-size:13px}
+@media (max-width:620px){ .line{grid-template-columns:1fr 1fr} .line > :last-child{grid-column:1 / -1;justify-self:end} }
+@media (prefers-reduced-motion:no-preference){ .sheet.anim{animation:slide .18s ease-out} @keyframes slide{from{transform:translateX(24px);opacity:.6}} }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="7" fill="var(--accent)"/><path d="M5 19h20M8 19l2.5-6h9L22 19" stroke="var(--accent-fg)" stroke-width="2" fill="none" stroke-linejoin="round"/><circle cx="10.5" cy="21" r="2" fill="var(--road)"/><circle cx="19.5" cy="21" r="2" fill="var(--road)"/></svg>
+        <div><h1>TourFleet Desk</h1><small>Tour vehicles, bookings and payments</small></div>
+      </div>
+      <div class="row">
+        <select id="companySel" aria-label="Company" style="width:auto;max-width:230px"></select>
+        <button id="manageCo" class="small">Companies</button>
+        <button id="signOut" class="small" hidden>Sign out</button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <a href="#overview" data-v="overview">Calendar</a>
+      <a href="#tours" data-v="tours">Tours &amp; payments</a>
+      <a href="#availability" data-v="availability">Availability</a>
+      <a href="#vehicles" data-v="vehicles">Vehicles</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"><div class="empty">Loading your fleet…</div></main>
+<div id="sheetRoot"></div>
+
+<script>
+(() => {
+'use strict';
+const COLS = ['companies','vehicles','tours'];
+const S = { companies:{}, vehicles:{}, tours:{} };
+let db = null, auth = null, user = null, unsubs = [], mode = 'loading', loaded = {companies:false,vehicles:false,tours:false};
+let view = 'overview', companyId = null, draft = null, draftKind = null;
+const ui = { calMonth:null, calVeh:'', tourFilter:'all', tourWhen:'upcoming', tourQ:'', avFrom:null, avTo:null, avType:'' };
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const pad = n => String(n).padStart(2,'0');
+const iso = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today = () => iso(new Date());
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate()+n); return iso(d); };
+const daysBetween = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fmtD = s => { if(!s) return '—'; const d = parse(s); return d.getDate()+' '+MON[d.getMonth()]; };
+const fmtDY = s => { if(!s) return '—'; const d = parse(s); return d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear(); };
+const range = (a,b) => a && b ? (a===b ? fmtDY(a) : (a.slice(0,4)===b.slice(0,4) ? fmtD(a)+' – '+fmtDY(b) : fmtDY(a)+' – '+fmtDY(b))) : '—';
+const overlaps = (a1,a2,b1,b2) => a1 <= b2 && b1 <= a2;
+const n = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+const cur = () => (S.companies[companyId]?.currency || 'LKR');
+const money = v => cur() + ' ' + Math.round(n(v)).toLocaleString('en-US');
+function toast(msg){ const t = document.createElement('div'); t.className='toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 2200); }
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+/* ---------- store ---------- */
+async function save(col, id, data){
+  S[col][id] = data; render();
+  if (db) { try { await db.collection(col).doc(id).set(data); } catch(e){ toast('Could not save: ' + (e?.message || e?.code || 'error')); } }
+  else lsSet('tfd-data', S);
+}
+async function remove(col, id){
+  delete S[col][id]; render();
+  if (db) { try { await db.collection(col).doc(id).delete(); } catch(e){ toast('Could not delete: ' + (e?.message || 'error')); } }
+  else lsSet('tfd-data', S);
+}
+async function boot(){
+  render();
+  const cfg = window.FIREBASE_CONFIG || {};
+  if (window.firebase && cfg.apiKey && !cfg.apiKey.startsWith('PASTE')) {
+    try { firebase.initializeApp(cfg); } catch(e) { toast('Firebase setup error: ' + e.message); }
+    auth = firebase.auth();
+    auth.onAuthStateChanged(u => {
+      user = u;
+      if (!u) { mode = 'login'; unsubs.forEach(f=>f()); unsubs = []; COLS.forEach(c=>{S[c]={};loaded[c]=false;}); companyId = null; render(); return; }
+      db = firebase.firestore(); mode = 'loading'; render(); subscribe();
+    });
+    return;
+  }
+  if (!db) {
+    mode = 'local';
+    const saved = lsGet('tfd-data');
+    if (saved) COLS.forEach(c => S[c] = saved[c] || {});
+    COLS.forEach(c => loaded[c] = true);
+    pickCompany(); render(); return;
+  }
+}
+function subscribe(){
+  mode = 'shared';
+  const timer = setTimeout(() => { if (!COLS.every(c=>loaded[c])) { mode = 'slow'; render(); } }, 10000);
+  COLS.forEach(c => {
+    unsubs.push(db.collection(c).onSnapshot(snap => {
+      const next = {}; snap.docs.forEach(d => next[d.id] = d.data()); S[c] = next; loaded[c] = true;
+      if (COLS.every(k=>loaded[k])) { clearTimeout(timer); if (mode==='slow') mode='shared'; }
+      pickCompany(); render();
+    }, err => { loaded[c] = true; if (err?.code === 'permission-denied') { mode = 'denied'; render(); return; } toast('Could not load ' + c + ': ' + (err?.message || err?.code)); render(); }));
+  });
+}
+function pickCompany(){
+  if (companyId && S.companies[companyId]) return;
+  const remembered = lsGet('tfd-company');
+  const ids = Object.keys(S.companies).sort((a,b)=> (S.companies[a].name||'').localeCompare(S.companies[b].name||''));
+  companyId = (remembered && S.companies[remembered]) ? remembered : (ids[0] || null);
+}
+
+/* ---------- domain ---------- */
+const vehiclesOf = () => Object.entries(S.vehicles).filter(([,v]) => v.companyId === companyId).map(([id,v]) => ({id, ...v})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+const toursOf = () => Object.entries(S.tours).filter(([,t]) => t.companyId === companyId).map(([id,t]) => ({id, ...t})).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+const paidOf = t => (t.payments||[]).reduce((s,p)=>s+n(p.amount),0);
+function payStatus(t){
+  const total = n(t.total), paid = paidOf(t);
+  if (total > 0 && paid >= total) return 'paid';
+  if (paid > 0) return 'partial';
+  return 'pending';
+}
+const isOverdue = t => !t.cancelled && payStatus(t) !== 'paid' && t.dueDate && t.dueDate < today();
+function payChip(t){
+  if (t.cancelled) return '<span class="chip cancel">Cancelled</span>';
+  const s = payStatus(t);
+  const label = {paid:'Paid',partial:'Partly paid',pending:'Pending'}[s];
+  return `<span class="chip ${s}">${label}</span>` + (isOverdue(t) ? ' <span class="chip overdue">Overdue</span>' : '');
+}
+function tripState(t){
+  if (t.cancelled) return 'Cancelled';
+  const d = today();
+  if (t.end < d) return 'Completed'; if (t.start > d) return 'Upcoming'; return 'On tour';
+}
+function bookingsFor(vid, from, to, exceptTourId){
+  return toursOf().filter(t => !t.cancelled && t.id !== exceptTourId && (t.vehicleIds||[]).includes(vid) && t.start && t.end && overlaps(t.start,t.end,from,to));
+}
+const vName = id => { const v = S.vehicles[id]; return v ? v.name : 'Removed vehicle'; };
+const exTag = o => o?.example ? ' <span class="chip ex">Example</span>' : '';
+
+/* ---------- render ---------- */
+function render(){
+  const sel = $('#companySel');
+  const cos = Object.entries(S.companies).sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
+  sel.innerHTML = cos.length ? cos.map(([id,c]) => `<option value="${id}"${id===companyId?' selected':''}>${esc(c.name)}</option>`).join('') : '<option>No company yet</option>';
+  sel.disabled = !cos.length;
+  $('#signOut').hidden = !user; $('#manageCo').hidden = mode === 'login' || mode === 'denied';
+  document.querySelectorAll('#tabs a').forEach(a => a.dataset.v === view ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
+  const m = $('#main');
+  if (mode === 'loading') { m.innerHTML = '<div class="empty">Loading your fleet…</div>'; return; }
+  let banner = '';
+  if (mode === 'login') { m.innerHTML = loginView(); return; }
+  if (mode === 'denied') { m.innerHTML = noAccessView(); return; }
+  if (mode === 'local') banner = '<div class="banner">Firebase is not set up yet, so data is saved in this browser only. Add your Firebase settings to firebase-config.js.</div>';
+  if (mode === 'slow') banner = '<div class="banner">Still waiting for saved data. Check your connection; the page will update when it arrives.</div>';
+  if (!companyId) { m.innerHTML = banner + noCompany(); return; }
+  const body = { overview:vOverview, tours:vTours, availability:vAvail, vehicles:vVehicles }[view]();
+  m.innerHTML = banner + body;
+}
+
+function loginView(){
+  return `<div class="panel" style="max-width:400px;margin:40px auto;width:100%"><div class="sec">
+    <h2>Sign in</h2><p class="muted" style="margin:0">Sign in with the Google account your company uses. Only approved accounts can see the data.</p>
+    <div id="lgErr" class="warnbox" hidden></div>
+    <button class="primary" data-act="google" style="display:flex;gap:10px;align-items:center;justify-content:center">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Sign in with Google</button></div></div>`;
+}
+function noAccessView(){
+  return `<div class="panel" style="max-width:460px;margin:40px auto;width:100%"><div class="sec">
+    <h2>No access for this account</h2>
+    <p style="margin:0">You are signed in as <b>${esc(user?.email)}</b>, but this account is not on the approved list. Ask the owner to add it, or sign in with another Google account.</p>
+    <button data-act="signOutBtn">Use another account</button></div></div>`;
+}
+function noCompany(){
+  return `<div class="panel"><div class="empty">
+    <h2 style="color:var(--fg)">Add your rental company</h2>
+    <p style="max-width:52ch;margin:0">Start with your company name. Then add vehicles, record tours with their dates and customers, and track every payment. You can run several companies from here.</p>
+    <div class="row"><button class="primary" data-act="newCompany">Add company</button><button data-act="loadSample">Load example data</button></div>
+  </div></div>`;
+}
+
+function monthCalendar(){
+  const t0 = today();
+  if (!ui.calMonth) ui.calMonth = t0.slice(0,7);
+  const [Y, M] = ui.calMonth.split('-').map(Number);
+  const first = new Date(Y, M-1, 1), last = new Date(Y, M, 0);
+  const mFrom = iso(first), mTo = iso(last);
+  const gridStart = addDays(mFrom, -((first.getDay()+6)%7));      // weeks start Monday
+  const weeks = Math.ceil((daysBetween(gridStart, mTo)+1)/7);
+  const vs = vehiclesOf();
+  let ts = toursOf().filter(t => !t.cancelled && t.start && t.end);
+  if (ui.calVeh) ts = ts.filter(t => (t.vehicleIds||[]).includes(ui.calVeh));
+  const inMonth = ts.filter(t => overlaps(t.start,t.end,mFrom,mTo));
+  const value = inMonth.reduce((s,t)=>s+n(t.total),0), got = inMonth.reduce((s,t)=>s+paidOf(t),0);
+  const busyDays = vs.length ? Math.round(100 * vs.reduce((s,v)=>{ let d=0; for(let i=0;i<=daysBetween(mFrom,mTo);i++){ const day=addDays(mFrom,i); if (ts.some(t=>(t.vehicleIds||[]).includes(v.id)&&t.start<=day&&t.end>=day)) d++; } return s+d; },0) / (vs.length*(daysBetween(mFrom,mTo)+1))) : 0;
+  const cls = t => isOverdue(t) ? 'overdue' : payStatus(t);
+  let html = '';
+  for (let w=0; w<weeks; w++){
+    const ws = addDays(gridStart, w*7), we = addDays(ws, 6);
+    const cells = Array.from({length:7}, (_,i) => { const d = addDays(ws,i); return `<div class="cell${d.slice(0,7)!==ui.calMonth?' out':''}${d===t0?' today':''}" data-act="calDay" data-d="${d}" title="Add a tour starting ${fmtDY(d)}"><span class="dn">${parse(d).getDate()}</span></div>`; }).join('');
+    const wt = ts.filter(t => overlaps(t.start,t.end,ws,we)).sort((a,b)=> a.start.localeCompare(b.start) || b.end.localeCompare(a.end));
+    const lanes = []; let bars = '';
+    wt.forEach(t => {
+      const s = Math.max(0, daysBetween(ws, t.start)), e = Math.min(6, daysBetween(ws, t.end));
+      let lane = lanes.findIndex(endCol => endCol < s); if (lane < 0) { lane = lanes.length; lanes.push(e); } else lanes[lane] = e;
+      const veh = (t.vehicleIds||[]).map(vName).join(', ');
+      bars += `<button class="bar ${cls(t)}${t.start<ws?' cont-l':''}${t.end>we?' cont-r':''}" style="grid-column:${s+1} / ${e+2};grid-row:${lane+1}" data-act="editTour" data-id="${t.id}" title="${esc(t.customer+' · '+range(t.start,t.end)+(veh?' · '+veh:'')+' · '+money(n(t.total)-paidOf(t))+' due')}">${esc(t.customer||'Tour')}${veh?` <span class="veh">· ${esc(veh)}</span>`:''}</button>`;
+    });
+    html += `<div class="wk"><div class="bg">${cells}</div><div class="bars">${bars}</div></div>`;
+  }
+  const dows = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const monthName = first.toLocaleString('en-US',{month:'long'});
+  return `<section class="panel cal">
+    <div class="cal-head">
+      <div class="cal-title">${monthName} ${Y}<small>${inMonth.length} tour${inMonth.length===1?'':'s'}</small></div>
+      <div class="row">
+        <select id="calVeh" aria-label="Show vehicle" style="width:auto"><option value="">All vehicles</option>${vs.map(v=>`<option value="${v.id}"${v.id===ui.calVeh?' selected':''}>${esc(v.name)}${v.plate?' · '+esc(v.plate):''}</option>`).join('')}</select>
+        <div class="cal-nav"><button data-act="calMove" data-m="-1" aria-label="Previous month">‹</button><button data-act="calToday">Today</button><button data-act="calMove" data-m="1" aria-label="Next month">›</button></div>
+        <button class="primary" data-act="newTour">New tour</button>
+      </div>
+    </div>
+    <div class="mstats"><div>Tour value<b>${money(value)}</b></div><div>Received<b>${money(got)}</b></div><div>To collect<b>${money(value-got)}</b></div><div>Fleet booked<b>${busyDays}%</b></div></div>
+    <div style="overflow-x:auto"><div class="cal-grid">
+      <div class="cal-dow">${dows.map((d,i)=>`<div class="${i>4?'we':''}">${d}</div>`).join('')}</div>
+      ${html}
+    </div></div>
+    <div class="spread"><div class="legend"><span><i style="background:var(--ok)"></i>Paid</span><span><i style="background:var(--warn)"></i>Partly paid</span><span><i style="background:var(--busy)"></i>Pending</span><span><i style="background:var(--bad)"></i>Overdue</span></div>
+      <span class="muted" style="font-size:12px">Click a day to add a tour. Click a bar to open it.</span></div>
+  </section>`;
+}
+
+function vOverview(){
+  const vs = vehiclesOf(), ts = toursOf().filter(t=>!t.cancelled), d = today(), in30 = addDays(d,30);
+  const active = ts.filter(t => t.start <= d && t.end >= d);
+  const upcoming = ts.filter(t => t.start > d && t.start <= in30);
+  const received = ts.reduce((s,t)=>s+paidOf(t),0);
+  const outstanding = ts.reduce((s,t)=>s+Math.max(0,n(t.total)-paidOf(t)),0);
+  const busyIds = new Set(active.flatMap(t=>t.vehicleIds||[]));
+  const due = ts.filter(t => payStatus(t)!=='paid' && n(t.total)>0).sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999')).slice(0,8);
+  return monthCalendar() + `
+  <div class="stats">
+    <div class="stat"><span>Vehicles free today</span><b>${vs.length - vs.filter(v=>busyIds.has(v.id)).length} / ${vs.length}</b></div>
+    <div class="stat"><span>On tour now</span><b>${active.length}</b></div>
+    <div class="stat"><span>Starting in 30 days</span><b>${upcoming.length}</b></div>
+    <div class="stat"><span>Received</span><b>${money(received)}</b></div>
+    <div class="stat"><span>Still to collect</span><b style="color:${outstanding?'var(--warn)':'inherit'}">${money(outstanding)}</b></div>
+  </div>
+  <div class="grid2">
+    <section class="panel sec">
+      <div class="spread"><h2>On tour and coming up</h2><button class="primary small" data-act="newTour">New tour</button></div>
+      ${[...active, ...upcoming].length ? `<div class="list">${[...active,...upcoming].map(t=>`
+        <div><div><button class="link" data-act="editTour" data-id="${t.id}">${esc(t.customer||'Unnamed')}</button>${exTag(t)}
+          <div class="muted" style="font-size:13px">${range(t.start,t.end)} · ${(t.vehicleIds||[]).map(vName).map(esc).join(', ') || 'No vehicle'}</div></div>
+          <span class="chip ${t.start<=d?'busy':'pending'}">${tripState(t)}</span></div>`).join('')}</div>`
+        : '<div class="empty">No tours in the next 30 days.</div>'}
+    </section>
+    <section class="panel sec">
+      <div class="spread"><h2>Payments to collect</h2><a href="#tours" class="muted" style="font-size:13px">All payments</a></div>
+      ${due.length ? `<div class="list">${due.map(t=>`
+        <div><div><button class="link" data-act="editTour" data-id="${t.id}">${esc(t.customer||'Unnamed')}</button>
+          <div class="muted" style="font-size:13px">Due ${fmtDY(t.dueDate)} · tour ${fmtD(t.start)}</div></div>
+          <div style="text-align:right"><div class="num">${money(n(t.total)-paidOf(t))}</div>${payChip(t)}</div></div>`).join('')}</div>`
+        : '<div class="empty">Every tour is fully paid.</div>'}
+    </section>
+  </div>`;
+}
+
+function vTours(){
+  const d = today();
+  let ts = toursOf();
+  if (ui.tourWhen==='upcoming') ts = ts.filter(t => t.end >= d);
+  if (ui.tourWhen==='past') ts = ts.filter(t => t.end < d).reverse();
+  if (ui.tourFilter==='overdue') ts = ts.filter(isOverdue);
+  else if (ui.tourFilter!=='all') ts = ts.filter(t => !t.cancelled && payStatus(t)===ui.tourFilter);
+  const q = ui.tourQ.trim().toLowerCase();
+  if (q) ts = ts.filter(t => [t.customer,t.country,t.phone,t.guide,...(t.vehicleIds||[]).map(vName)].join(' ').toLowerCase().includes(q));
+  const tot = ts.filter(t=>!t.cancelled).reduce((a,t)=>({total:a.total+n(t.total),paid:a.paid+paidOf(t)}),{total:0,paid:0});
+  return `
+  <div class="spread">
+    <h2>Tours &amp; payments</h2>
+    <button class="primary" data-act="newTour">New tour</button>
+  </div>
+  <div class="row">
+    <select id="fWhen" style="width:auto"><option value="upcoming">Current &amp; upcoming</option><option value="past">Past tours</option><option value="all">All tours</option></select>
+    <select id="fPay" style="width:auto"><option value="all">Any payment status</option><option value="pending">Pending</option><option value="partial">Partly paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select>
+    <input id="fQ" type="search" placeholder="Search customer, country, vehicle" style="max-width:280px" value="${esc(ui.tourQ)}">
+  </div>
+  <div class="tablebox"><table>
+    <thead><tr><th>Dates</th><th>Customer / group</th><th>Vehicles</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th><th>Payment</th></tr></thead>
+    <tbody>${ts.length ? ts.map(t => `<tr class="click" data-act="editTour" data-id="${t.id}">
+      <td class="mono" style="white-space:nowrap">${range(t.start,t.end)}<div class="muted" style="font-size:12px;font-family:var(--body)">${tripState(t)} · ${t.start&&t.end?daysBetween(t.start,t.end)+1:'?'} days</div></td>
+      <td><b style="font-weight:600">${esc(t.customer||'Unnamed')}</b>${exTag(t)}<div class="muted" style="font-size:12px">${t.pax?esc(t.pax)+' pax':''}${t.country?' · '+esc(t.country):''}</div></td>
+      <td>${(t.vehicleIds||[]).map(id=>esc(vName(id))).join('<br>') || '<span class="muted">—</span>'}</td>
+      <td class="num">${money(t.total)}</td><td class="num">${money(paidOf(t))}</td><td class="num">${money(Math.max(0,n(t.total)-paidOf(t)))}</td>
+      <td>${payChip(t)}${t.dueDate && payStatus(t)!=='paid' && !t.cancelled ? `<div class="muted" style="font-size:12px">due ${fmtD(t.dueDate)}</div>`:''}</td></tr>`).join('')
+      : `<tr><td colspan="7"><div class="empty">No tours match these filters.</div></td></tr>`}</tbody>
+  </table></div>
+  ${ts.length ? `<div class="sum"><div><span class="muted">Total value</span><b>${money(tot.total)}</b></div><div><span class="muted">Received</span><b>${money(tot.paid)}</b></div><div><span class="muted">Balance</span><b>${money(tot.total-tot.paid)}</b></div></div>`:''}`;
+}
+
+function vAvail(){
+  if (!ui.avFrom) { ui.avFrom = today(); ui.avTo = addDays(today(), 13); }
+  let from = ui.avFrom, to = ui.avTo < ui.avFrom ? ui.avFrom : ui.avTo;
+  const span = Math.min(daysBetween(from,to)+1, 62);
+  const vsAll = vehiclesOf();
+  const types = [...new Set(vsAll.map(v=>v.type).filter(Boolean))].sort();
+  const vs = vsAll.filter(v => !ui.avType || v.type===ui.avType);
+  const rows = vs.map(v => ({v, b: bookingsFor(v.id, from, to)}));
+  const free = rows.filter(r=>!r.b.length), busy = rows.filter(r=>r.b.length);
+  const days = Array.from({length:span}, (_,i)=>addDays(from,i));
+  return `
+  <div class="spread"><h2>Vehicle availability</h2></div>
+  <div class="panel row" style="align-items:end">
+    <label class="f" style="width:170px">From<input type="date" id="avFrom" value="${from}"></label>
+    <label class="f" style="width:170px">To<input type="date" id="avTo" value="${to}"></label>
+    <label class="f" style="width:170px">Vehicle type<select id="avType"><option value="">All types</option>${types.map(t=>`<option${t===ui.avType?' selected':''}>${esc(t)}</option>`).join('')}</select></label>
+    <div class="row" style="padding-bottom:2px">
+      <button class="small" data-act="avQuick" data-d="7">Next 7 days</button>
+      <button class="small" data-act="avQuick" data-d="14">Next 14 days</button>
+      <button class="small" data-act="avQuick" data-d="30">Next 30 days</button>
+    </div>
+  </div>
+  ${!vs.length ? '<div class="panel"><div class="empty">Add vehicles first to see their availability.<button class="primary" data-act="newVehicle">Add vehicle</button></div></div>' : `
+  <div class="grid2">
+    <section class="panel sec"><h3>Free for the whole range · ${free.length}</h3>
+      ${free.length ? `<div class="list">${free.map(({v})=>`<div><div><b style="font-weight:600">${esc(v.name)}</b> <span class="plate">${esc(v.plate||'')}</span><div class="muted" style="font-size:12px">${esc(v.type||'')}${v.seats?' · '+esc(v.seats)+' seats':''}${v.rate?' · '+money(v.rate)+'/day':''}</div></div>
+        <button class="small" data-act="bookVehicle" data-id="${v.id}">Book</button></div>`).join('')}</div>` : '<div class="empty">No vehicle is free for every day of this range.</div>'}
+    </section>
+    <section class="panel sec"><h3>Booked during this range · ${busy.length}</h3>
+      ${busy.length ? `<div class="list">${busy.map(({v,b})=>`<div><div><b style="font-weight:600">${esc(v.name)}</b> <span class="plate">${esc(v.plate||'')}</span>
+        <div style="font-size:12px">${b.map(t=>`<button class="link" data-act="editTour" data-id="${t.id}">${esc(t.customer||'Tour')}</button> <span class="muted">${range(t.start,t.end)}</span>`).join('<br>')}</div></div>
+        <span class="chip busy">Busy</span></div>`).join('')}</div>` : '<div class="empty">Nothing booked in this range.</div>'}
+    </section>
+  </div>
+  <section class="panel sec">
+    <div class="spread"><h3>Day by day</h3><span class="muted" style="font-size:12px">${span<daysBetween(from,to)+1?'Showing the first 62 days. ':''}Blue = on a tour. Hover a block to see the customer.</span></div>
+    <div style="overflow-x:auto"><table class="tl">
+      <thead><tr><th></th>${days.map(d=>{const dt=parse(d);const we=dt.getDay()===0||dt.getDay()===6;return `<th class="d${we?' we':''}">${WD[dt.getDay()].slice(0,2)}<br>${dt.getDate()}</th>`}).join('')}</tr></thead>
+      <tbody>${rows.map(({v,b})=>`<tr><td class="v">${esc(v.name)}</td>${days.map(d=>{
+        const t = b.find(t=>t.start<=d && t.end>=d);
+        if(!t) return '<td class="c"></td>';
+        return `<td class="c on${t.start===d||d===from?' start':''}${t.end===d||d===days[days.length-1]?' end':''}" title="${esc((t.customer||'Tour')+' · '+range(t.start,t.end))}"></td>`;
+      }).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+  </section>`}`;
+}
+
+function vVehicles(){
+  const vs = vehiclesOf(), d = today();
+  return `
+  <div class="spread"><h2>Vehicles · ${esc(S.companies[companyId]?.name)}</h2><button class="primary" data-act="newVehicle">Add vehicle</button></div>
+  <div class="tablebox"><table>
+    <thead><tr><th>Vehicle</th><th>Number plate</th><th>Type</th><th class="num">Seats</th><th class="num">Daily rate</th><th>Driver</th><th>Now / next</th></tr></thead>
+    <tbody>${vs.length ? vs.map(v => {
+      const b = toursOf().filter(t=>!t.cancelled && (t.vehicleIds||[]).includes(v.id) && t.end >= d);
+      const now = b.find(t=>t.start<=d);
+      const next = b.find(t=>t.start>d);
+      return `<tr class="click" data-act="editVehicle" data-id="${v.id}">
+        <td><b style="font-weight:600">${esc(v.name)}</b>${exTag(v)}${v.notes?`<div class="muted" style="font-size:12px">${esc(v.notes)}</div>`:''}</td>
+        <td><span class="plate">${esc(v.plate||'—')}</span></td><td>${esc(v.type||'—')}</td><td class="num">${esc(v.seats||'—')}</td>
+        <td class="num">${v.rate?money(v.rate):'—'}</td><td>${esc(v.driver||'—')}${v.driverPhone?`<div class="muted mono" style="font-size:12px">${esc(v.driverPhone)}</div>`:''}</td>
+        <td>${now?`<span class="chip busy">On tour until ${fmtD(now.end)}</span>`:'<span class="chip free">Free today</span>'}${next?`<div class="muted" style="font-size:12px">Next: ${fmtD(next.start)} · ${esc(next.customer||'')}</div>`:''}</td></tr>`;
+    }).join('') : `<tr><td colspan="7"><div class="empty">No vehicles yet. Add your cars, vans and buses to start booking tours.</div></td></tr>`}</tbody>
+  </table></div>`;
+}
+
+/* ---------- sheets (editors) ---------- */
+function openSheet(kind, data){ draftKind = kind; draft = data; renderSheet(); $('.sheet').classList.add('anim'); $('.sheet').scrollTop = 0; $('.sheet input:not([type=checkbox])')?.focus({preventScroll:true}); }
+function closeSheet(){ draft = null; draftKind = null; $('#sheetRoot').innerHTML = ''; }
+function renderSheet(){
+  if (!draft) return;
+  const html = { tour:sheetTour, vehicle:sheetVehicle, company:sheetCompany }[draftKind]();
+  const y = $('.sheet')?.scrollTop || 0;
+  $('#sheetRoot').innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  $('.sheet').scrollTop = y;
+}
+const fld = (label, key, type='text', extra='') => `<label class="f">${label}<input id="d-${key}" data-f="${key}" type="${type}" value="${esc(draft[key]??'')}" ${extra}></label>`;
+function head(title, canDelete){
+  return `<div class="sheet-head"><h2>${title}</h2><div class="row">
+    ${canDelete?'<button class="danger small" data-act="del">Delete</button>':''}
+    <button data-act="close">Cancel</button><button class="primary" data-act="saveDraft">Save</button></div></div>`;
+}
+
+function sheetCompany(){
+  const list = Object.entries(S.companies);
+  return head(draft._id ? 'Edit company' : 'Add company', !!draft._id) + `<div class="sheet-body">
+    <div class="fields">${fld('Company name','name','text','required')}${fld('Phone','phone','tel')}${fld('Email','email','email')}${fld('Currency code','currency','text','maxlength="4" placeholder="LKR"')}</div>
+    ${list.length ? `<div class="sec"><div class="spread"><h3>Your companies</h3><button class="small" data-act="newCompany">Add another</button></div>
+      <div class="list">${list.map(([id,c])=>`<div><div><b style="font-weight:600">${esc(c.name)}</b>${exTag(c)}<div class="muted" style="font-size:12px">${Object.values(S.vehicles).filter(v=>v.companyId===id).length} vehicles · ${Object.values(S.tours).filter(t=>t.companyId===id).length} tours</div></div>
+      <button class="small" data-act="editCompany" data-id="${id}">Edit</button></div>`).join('')}</div></div>`:''}
+  </div>`;
+}
+
+function sheetVehicle(){
+  return head(draft._id ? 'Edit vehicle' : 'Add vehicle', !!draft._id) + `<div class="sheet-body">
+    <div class="fields">
+      ${fld('Vehicle name / model','name','text','placeholder="Toyota KDH van"')}
+      ${fld('Number plate','plate','text','placeholder="WP PH-4521"')}
+      <label class="f">Type<select data-f="type" id="d-type">${['Car','Van','Mini bus','Bus','SUV / Jeep','Tuk tuk','Other'].map(t=>`<option${draft.type===t?' selected':''}>${t}</option>`).join('')}</select></label>
+      ${fld('Seats','seats','number','min="1"')}
+      ${fld('Daily rate ('+esc(cur())+')','rate','number','min="0"')}
+      ${fld('Driver name','driver')}
+      ${fld('Driver phone','driverPhone','tel')}
+    </div>
+    <label class="f">Notes<textarea data-f="notes" id="d-notes" placeholder="A/C, luggage space, insurance renewal date…">${esc(draft.notes||'')}</textarea></label>
+  </div>`;
+}
+
+function sheetTour(){
+  const t = draft, vs = vehiclesOf();
+  const total = n(t.total), paid = (t.payments||[]).reduce((s,p)=>s+n(p.amount),0);
+  const status = payStatus(t);
+  const clashes = [];
+  const vpick = vs.length ? vs.map(v => {
+    const b = t.start && t.end ? bookingsFor(v.id, t.start, t.end, t._id) : [];
+    const on = (t.vehicleIds||[]).includes(v.id);
+    if (on && b.length) clashes.push(`${v.name} is already booked for ${b.map(x=>esc(x.customer)+' ('+range(x.start,x.end)+')').join(', ')}`);
+    return `<label class="${on&&b.length?'clash':''}"><input type="checkbox" data-veh="${v.id}" ${on?'checked':''}>
+      <span><b style="font-weight:600">${esc(v.name)}</b> <span class="plate">${esc(v.plate||'')}</span><br>
+      <span class="muted">${esc(v.type||'')}${v.seats?' · '+esc(v.seats)+' seats':''}</span>
+      ${t.start&&t.end ? (b.length?` <span class="chip busy">Booked</span>`:` <span class="chip free">Free</span>`):''}</span></label>`;
+  }).join('') : '<div class="muted">No vehicles yet. Add vehicles in the Vehicles tab.</div>';
+  const days = t.start && t.end ? daysBetween(t.start, t.end) + 1 : 0;
+  return head(t._id ? 'Edit tour' : 'New tour', !!t._id) + `<div class="sheet-body">
+    <section class="sec"><div class="spread"><h3>Customer / group</h3>
+      <label class="row" style="font-size:13px;gap:6px"><input type="checkbox" id="d-cancelled" data-fc="cancelled" style="width:auto" ${t.cancelled?'checked':''}> Tour cancelled</label></div>
+      <div class="fields">${fld('Customer or group name','customer','text','placeholder="Müller family"')}${fld('Number of people','pax','number','min="1"')}${fld('Country','country')}${fld('Phone / WhatsApp','phone','tel')}${fld('Email','email','email')}</div>
+    </section>
+    <section class="sec"><div class="spread"><h3>Tour dates</h3>${days>0?`<span class="muted">${days} days, ${days-1} nights</span>`:''}</div>
+      <div class="fields">${fld('Start date','start','date')}${fld('End date','end','date')}${fld('Pick-up place','pickup','text','placeholder="BIA Katunayake"')}${fld('Drop-off place','dropoff')}${fld('Driver / guide','guide')}</div>
+      ${t.start && t.end && t.end < t.start ? '<div class="warnbox">The end date is before the start date.</div>':''}
+    </section>
+    <section class="sec"><h3>Vehicles</h3>
+      <div class="vpick">${vpick}</div>
+      ${clashes.length ? `<div class="warnbox">Double booking: ${clashes.join('; ')}.</div>`:''}
+    </section>
+    <section class="sec"><div class="spread"><h3>Payments</h3>${payChip({...t})}</div>
+      <div class="fields">${fld('Total tour price ('+esc(cur())+')','total','number','min="0"')}${fld('Payment due date','dueDate','date')}</div>
+      <div class="lines">${(t.payments||[]).map((p,i)=>`<div class="line">
+        <label class="f">Date<input type="date" data-arr="payments" data-i="${i}" data-k="date" value="${esc(p.date)}"></label>
+        <label class="f">Amount<input type="number" min="0" data-arr="payments" data-i="${i}" data-k="amount" value="${esc(p.amount)}"></label>
+        <label class="f">Method<select data-arr="payments" data-i="${i}" data-k="method">${['Cash','Bank transfer','Card','Online','Other'].map(m=>`<option${p.method===m?' selected':''}>${m}</option>`).join('')}</select></label>
+        <label class="f">Note<input data-arr="payments" data-i="${i}" data-k="note" value="${esc(p.note)}" placeholder="Advance"></label>
+        <button class="danger small" data-act="rmRow" data-arr="payments" data-i="${i}" aria-label="Remove payment">Remove</button></div>`).join('')}</div>
+      <div class="spread"><button class="small" data-act="addPay">Add payment</button>
+        <div class="sum"><div><span class="muted">Paid</span><b>${money(paid)}</b></div><div><span class="muted">Balance</span><b style="color:${total-paid>0?'var(--warn)':'var(--ok)'}">${money(Math.max(0,total-paid))}</b></div></div></div>
+    </section>
+    <section class="sec"><div class="spread"><h3>Itinerary</h3><div class="row">
+      ${days>0?`<button class="small" data-act="genDays">${(t.itinerary||[]).length?'Match days to dates':'Create days from dates'}</button>`:''}
+      <button class="small" data-act="addDay">Add day</button>
+      ${(t.itinerary||[]).length?'<button class="small" data-act="copyItin">Copy as text</button>':''}</div></div>
+      ${(t.itinerary||[]).length ? '' : '<div class="muted">Set the tour dates, then create one entry per day: route, places to visit and the hotel for the night.</div>'}
+      <div class="lines">${(t.itinerary||[]).map((d,i)=>`<div class="day">
+        <div class="spread"><span class="dn">DAY ${i+1}${d.date?' · '+WD[parse(d.date).getDay()]+' '+fmtDY(d.date):''}</span>
+          <div class="row"><button class="small" data-act="mvDay" data-i="${i}" data-dir="-1" aria-label="Move up" ${i===0?'disabled':''}>↑</button><button class="small" data-act="mvDay" data-i="${i}" data-dir="1" aria-label="Move down" ${i===t.itinerary.length-1?'disabled':''}>↓</button><button class="danger small" data-act="rmRow" data-arr="itinerary" data-i="${i}">Remove</button></div></div>
+        <div class="fields">
+          <label class="f">Date<input type="date" data-arr="itinerary" data-i="${i}" data-k="date" value="${esc(d.date)}"></label>
+          <label class="f">Route<input data-arr="itinerary" data-i="${i}" data-k="route" value="${esc(d.route)}" placeholder="Negombo → Sigiriya"></label>
+          <label class="f">Distance (km)<input type="number" min="0" data-arr="itinerary" data-i="${i}" data-k="km" value="${esc(d.km)}"></label>
+          <label class="f">Overnight hotel<input data-arr="itinerary" data-i="${i}" data-k="hotel" value="${esc(d.hotel)}"></label>
+        </div>
+        <label class="f">Places &amp; activities<textarea data-arr="itinerary" data-i="${i}" data-k="activities" placeholder="Dambulla cave temple, Sigiriya rock at 3 pm">${esc(d.activities)}</textarea></label>
+      </div>`).join('')}</div>
+      ${(t.itinerary||[]).some(d=>n(d.km))?`<div class="muted">Total distance: <span class="mono">${(t.itinerary||[]).reduce((s,d)=>s+n(d.km),0).toLocaleString()} km</span></div>`:''}
+    </section>
+    <label class="f">Notes<textarea data-f="notes" id="d-notes">${esc(t.notes||'')}</textarea></label>
+  </div>`;
+}
+
+function itinText(t){
+  const lines = [`${t.customer||'Tour'} · ${range(t.start,t.end)}`, t.pax?`${t.pax} people`:'', (t.vehicleIds||[]).length?'Vehicle: '+t.vehicleIds.map(vName).join(', '):'', t.guide?'Driver/guide: '+t.guide:'', ''];
+  (t.itinerary||[]).forEach((d,i)=>{
+    lines.push(`Day ${i+1}${d.date?' ('+WD[parse(d.date).getDay()]+' '+fmtDY(d.date)+')':''}: ${d.route||''}${d.km?' · '+d.km+' km':''}`);
+    if (d.activities) lines.push('  '+d.activities.replace(/\n/g,'\n  '));
+    if (d.hotel) lines.push('  Night: '+d.hotel);
+  });
+  return lines.filter((l,i)=>l!==''||i>0).join('\n');
+}
+
+function clean(o){ const r = {}; Object.keys(o).forEach(k => { if (k[0] !== '_' && o[k] !== undefined) r[k] = o[k]; }); return r; }
+function saveDraft(){
+  const d = draft;
+  if (draftKind === 'company') {
+    if (!d.name?.trim()) return toast('Enter a company name');
+    const id = d._id || uid(); d.currency = (d.currency||'LKR').toUpperCase().trim() || 'LKR';
+    save('companies', id, clean({...d, name:d.name.trim()})); companyId = id; lsSet('tfd-company', id); toast('Company saved');
+  } else if (draftKind === 'vehicle') {
+    if (!d.name?.trim()) return toast('Enter the vehicle name or model');
+    save('vehicles', d._id || uid(), clean({...d, companyId: d.companyId || companyId})); toast('Vehicle saved');
+  } else {
+    if (!d.customer?.trim()) return toast('Enter the customer or group name');
+    if (!d.start || !d.end) return toast('Enter the start and end dates');
+    if (d.end < d.start) return toast('The end date is before the start date');
+    save('tours', d._id || uid(), clean({...d, companyId: d.companyId || companyId, updated: new Date().toISOString()})); toast('Tour saved');
+  }
+  closeSheet();
+}
+
+/* ---------- sample data (local mode only) ---------- */
+function sampleData(){
+  const c = uid(), t0 = today(), v = [uid(),uid(),uid(),uid()];
+  S.companies[c] = {name:'Example: Lanka Tour Wheels', currency:'LKR', phone:'077 000 0000', example:true};
+  [['Toyota KDH High Roof','WP PH-4521','Van',9,18000,'Nimal'],['Toyota Prius','CAR-7781','Car',3,12000,'Kasun'],['Toyota Coaster','NC-2290','Mini bus',26,32000,'Sunil'],['Suzuki Every','WP BHI-1203','Van',5,10000,'Ruwan']]
+    .forEach(([name,plate,type,seats,rate,driver],i)=> S.vehicles[v[i]] = {companyId:c,name,plate,type,seats,rate,driver,example:true});
+  const tours = [
+    {customer:'Example: Müller family', pax:4, country:'Germany', start:addDays(t0,-2), end:addDays(t0,5), vehicleIds:[v[0]], total:240000, dueDate:addDays(t0,5), payments:[{date:addDays(t0,-20),amount:80000,method:'Bank transfer',note:'Advance'}],
+      itinerary:[{date:addDays(t0,-2),route:'Airport → Negombo',km:12,hotel:'Jetwing Lagoon',activities:'Pick-up at BIA, rest day'},{date:addDays(t0,-1),route:'Negombo → Sigiriya',km:150,hotel:'Sigiriya Village',activities:'Dambulla cave temple'}]},
+    {customer:'Example: Tanaka group', pax:18, country:'Japan', start:addDays(t0,6), end:addDays(t0,12), vehicleIds:[v[2]], total:560000, dueDate:addDays(t0,6), payments:[]},
+    {customer:'Example: Sarah & Tom', pax:2, country:'UK', start:addDays(t0,3), end:addDays(t0,9), vehicleIds:[v[1]], total:150000, dueDate:addDays(t0,-1), payments:[{date:addDays(t0,-10),amount:50000,method:'Card',note:'Deposit'}]},
+    {customer:'Example: Dubois couple', pax:2, country:'France', start:addDays(t0,-15), end:addDays(t0,-8), vehicleIds:[v[3]], total:96000, dueDate:addDays(t0,-8), payments:[{date:addDays(t0,-15),amount:96000,method:'Cash',note:'Full'}]},
+  ];
+  tours.forEach(t => S.tours[uid()] = {...t, companyId:c, example:true});
+  companyId = c; lsSet('tfd-company', c);
+  if (db) { COLS.forEach(col => Object.entries(S[col]).forEach(([id,d]) => { if (d.companyId===c || id===c) db.collection(col).doc(id).set(d).catch(e=>toast('Could not save: '+e.message)); })); }
+  else lsSet('tfd-data', S);
+  render();
+}
+
+/* ---------- events ---------- */
+function setView(){ const h = location.hash.slice(1); view = ['overview','tours','availability','vehicles'].includes(h) ? h : 'overview'; render(); }
+window.addEventListener('hashchange', setView);
+$('#companySel').addEventListener('change', e => { companyId = e.target.value; lsSet('tfd-company', companyId); render(); });
+$('#manageCo').addEventListener('click', () => { const c = S.companies[companyId]; openSheet('company', c ? {...c, _id:companyId} : {currency:'LKR'}); });
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, id = el.dataset.id;
+  if (a === 'scrim') { if (e.target === el) closeSheet(); return; }
+  if (el.tagName === 'TR' && e.target.closest('button,a,input')) return;
+  switch (a) {
+    case 'google': {
+      const err = $('#lgErr'); err.hidden = true;
+      const prov = new firebase.auth.GoogleAuthProvider(); prov.setCustomParameters({prompt:'select_account'});
+      auth.signInWithPopup(prov).catch(x => {
+        if (x.code === 'auth/popup-blocked' || x.code === 'auth/operation-not-supported-in-this-environment') return auth.signInWithRedirect(prov);
+        if (x.code === 'auth/popup-closed-by-user' || x.code === 'auth/cancelled-popup-request') return;
+        err.hidden = false; err.textContent = 'Could not sign in: ' + (x.message || x.code);
+      });
+      break; }
+    case 'signOutBtn': auth && auth.signOut(); break;
+    case 'newCompany': openSheet('company', {currency:'LKR'}); break;
+    case 'editCompany': openSheet('company', {...S.companies[id], _id:id}); break;
+    case 'loadSample': sampleData(); break;
+    case 'newVehicle': if (!companyId) return; openSheet('vehicle', {type:'Van'}); break;
+    case 'editVehicle': openSheet('vehicle', {...S.vehicles[id], _id:id}); break;
+    case 'newTour': if (!companyId) return; openSheet('tour', {vehicleIds:[], payments:[], itinerary:[]}); break;
+    case 'bookVehicle': openSheet('tour', {vehicleIds:[id], payments:[], itinerary:[], start:ui.avFrom, end:ui.avTo}); break;
+    case 'editTour': { const t = S.tours[id]; openSheet('tour', JSON.parse(JSON.stringify({...t, vehicleIds:t.vehicleIds||[], payments:t.payments||[], itinerary:t.itinerary||[], _id:id}))); break; }
+    case 'close': closeSheet(); break;
+    case 'saveDraft': saveDraft(); break;
+    case 'del':
+      if (!el.classList.contains('armed')) { el.classList.add('armed'); el.textContent = 'Click again to delete'; setTimeout(()=>{ if (el.isConnected){ el.classList.remove('armed'); el.textContent='Delete'; } }, 4000); return; }
+      { const col = {tour:'tours',vehicle:'vehicles',company:'companies'}[draftKind], did = draft._id;
+        if (draftKind === 'company') { Object.entries(S.vehicles).filter(([,v])=>v.companyId===did).forEach(([vid])=>remove('vehicles',vid)); Object.entries(S.tours).filter(([,t])=>t.companyId===did).forEach(([tid])=>remove('tours',tid)); companyId = null; }
+        remove(col, did); pickCompany(); closeSheet(); render(); toast('Deleted'); }
+      break;
+    case 'addPay': draft.payments.push({date:today(), amount:'', method:'Cash', note:''}); renderSheet(); break;
+    case 'addDay': { const last = draft.itinerary[draft.itinerary.length-1]; draft.itinerary.push({date: last?.date ? addDays(last.date,1) : (draft.start||''), route:'', km:'', hotel:'', activities:''}); renderSheet(); break; }
+    case 'genDays': {
+      const nDays = daysBetween(draft.start, draft.end) + 1; const old = draft.itinerary;
+      draft.itinerary = Array.from({length:nDays}, (_,i) => ({...(old[i]||{route:'',km:'',hotel:'',activities:''}), date:addDays(draft.start,i)}));
+      if (old.length > nDays) toast(`Kept the first ${nDays} days to match the dates`);
+      renderSheet(); break; }
+    case 'mvDay': { const i = +el.dataset.i, j = i + (+el.dataset.dir); const arr = draft.itinerary; [arr[i],arr[j]] = [arr[j],arr[i]]; renderSheet(); break; }
+    case 'rmRow': draft[el.dataset.arr].splice(+el.dataset.i,1); renderSheet(); break;
+    case 'copyItin': {
+      const txt = itinText(draft);
+      const fallback = () => { const ta = document.createElement('textarea'); ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); let ok=false; try{ ok = document.execCommand('copy'); }catch{} ta.remove(); toast(ok?'Itinerary copied':'Copy blocked. Select the text manually.'); };
+      try { navigator.clipboard.writeText(txt).then(()=>toast('Itinerary copied. Paste it into WhatsApp or email.'), fallback); } catch { fallback(); }
+      break; }
+    case 'calMove': { const [y,m] = ui.calMonth.split('-').map(Number); const d = new Date(y, m-1+(+el.dataset.m), 1); ui.calMonth = d.getFullYear()+'-'+pad(d.getMonth()+1); render(); break; }
+    case 'calToday': ui.calMonth = today().slice(0,7); render(); break;
+    case 'calDay': if (!companyId) return; { const d = el.dataset.d; openSheet('tour', {vehicleIds: ui.calVeh?[ui.calVeh]:[], payments:[], itinerary:[], start:d, end:addDays(d,6)}); } break;
+    case 'avQuick': ui.avFrom = today(); ui.avTo = addDays(today(), +el.dataset.d - 1); render(); break;
+  }
+});
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (draft && el.closest('.sheet')) {
+    if (el.dataset.f) { draft[el.dataset.f] = el.type === 'number' ? (el.value === '' ? '' : +el.value) : el.value; if (draftKind==='tour' && ['start','end','total'].includes(el.dataset.f) && e.type==='change') renderSheet(); }
+    else if (el.dataset.arr) { const v = el.type === 'number' ? (el.value === '' ? '' : +el.value) : el.value; draft[el.dataset.arr][+el.dataset.i][el.dataset.k] = v; }
+    return;
+  }
+  if (el.id === 'fQ') { ui.tourQ = el.value; const pos = el.selectionStart; render(); const q = $('#fQ'); q.focus(); try{ q.setSelectionRange(pos,pos); }catch{} }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (draft && el.closest('.sheet')) {
+    if (el.dataset.veh) { const s = new Set(draft.vehicleIds); el.checked ? s.add(el.dataset.veh) : s.delete(el.dataset.veh); draft.vehicleIds = [...s]; renderSheet(); }
+    else if (el.dataset.fc) { draft[el.dataset.fc] = el.checked; renderSheet(); }
+    else if (el.dataset.f && ['start','end','total','dueDate'].includes(el.dataset.f)) renderSheet();
+    else if (el.dataset.arr === 'payments' && el.dataset.k === 'amount') renderSheet();
+    return;
+  }
+  if (el.id === 'fWhen') { ui.tourWhen = el.value; render(); }
+  if (el.id === 'fPay') { ui.tourFilter = el.value; render(); }
+  if (el.id === 'avFrom') { ui.avFrom = el.value || today(); if (ui.avTo < ui.avFrom) ui.avTo = ui.avFrom; render(); }
+  if (el.id === 'avTo') { ui.avTo = el.value || ui.avFrom; render(); }
+  if (el.id === 'calVeh') { ui.calVeh = el.value; render(); }
+  if (el.id === 'avType') { ui.avType = el.value; render(); }
+});
+$('#signOut').addEventListener('click', () => auth && auth.signOut());
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && draft) closeSheet(); });
+// keep filter selects showing current values after re-render
+const _render = render;
+render = function(){ _render(); const w = $('#fWhen'); if (w) w.value = ui.tourWhen; const p = $('#fPay'); if (p) p.value = ui.tourFilter; };
+
+setView();
+boot();
+})();
+</script>
+
+</body></html>

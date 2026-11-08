@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Google accounts that may use the system. Add your staff emails here,
+    // then run: firebase deploy --only firestore:rules
+    function isStaff() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'madsruzza@gmail.com'
+        ];
+    }
+
+    match /{collection}/{docId} {
+      allow read, write: if isStaff()
+        && collection in ['companies', 'vehicles', 'tours'];
+    }
+  }
+}
