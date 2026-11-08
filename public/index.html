@@ -369,6 +369,8 @@ function tripState(t){
 function bookingsFor(vid, from, to, exceptTourId){
   return toursOf().filter(t => !t.cancelled && t.id !== exceptTourId && (t.vehicleIds||[]).includes(vid) && t.start && t.end && overlaps(t.start,t.end,from,to));
 }
+const t12 = v => { if (!v) return ''; const [h,m] = v.split(':').map(Number); return (h%12||12) + ':' + pad(m) + (h<12?' AM':' PM'); };
+const times = t => [t.arrTime||t.arrFlight ? 'Arrive ' + [t12(t.arrTime), t.arrFlight].filter(Boolean).join(' · ') : '', t.depTime||t.depFlight ? 'Depart ' + [t12(t.depTime), t.depFlight].filter(Boolean).join(' · ') : ''].filter(Boolean).join(' — ');
 const vName = id => { const v = S.vehicles[id]; return v ? v.name : 'Removed vehicle'; };
 const exTag = o => o?.example ? ' <span class="chip ex">Example</span>' : '';
 
@@ -441,7 +443,7 @@ function monthCalendar(){
       const s = Math.max(0, daysBetween(ws, t.start)), e = Math.min(6, daysBetween(ws, t.end));
       let lane = lanes.findIndex(endCol => endCol < s); if (lane < 0) { lane = lanes.length; lanes.push(e); } else lanes[lane] = e;
       const veh = (t.vehicleIds||[]).map(vName).join(', ');
-      bars += `<button class="bar ${cls(t)}${t.start<ws?' cont-l':''}${t.end>we?' cont-r':''}" style="grid-column:${s+1} / ${e+2};grid-row:${lane+1}" data-act="editTour" data-id="${t.id}" title="${esc(t.customer+' · '+range(t.start,t.end)+(veh?' · '+veh:'')+' · '+money(n(t.total)-paidOf(t))+' due')}">${esc(t.customer||'Tour')}${veh?` <span class="veh">· ${esc(veh)}</span>`:''}</button>`;
+      bars += `<button class="bar ${cls(t)}${t.start<ws?' cont-l':''}${t.end>we?' cont-r':''}" style="grid-column:${s+1} / ${e+2};grid-row:${lane+1}" data-act="editTour" data-id="${t.id}" title="${esc(t.customer+' · '+range(t.start,t.end)+(times(t)?' · '+times(t):'')+(veh?' · '+veh:'')+' · '+money(n(t.total)-paidOf(t))+' due')}">${esc(t.customer||'Tour')}${veh?` <span class="veh">· ${esc(veh)}</span>`:''}</button>`;
     });
     html += `<div class="wk"><div class="bg">${cells}</div><div class="bars">${bars}</div></div>`;
   }
@@ -488,7 +490,7 @@ function vOverview(){
       <div class="spread"><h2>On tour and coming up</h2><button class="primary small" data-act="newTour">New tour</button></div>
       ${[...active, ...upcoming].length ? `<div class="list">${[...active,...upcoming].map(t=>`
         <div><div><button class="link" data-act="editTour" data-id="${t.id}">${esc(t.customer||'Unnamed')}</button>${exTag(t)}
-          <div class="muted" style="font-size:13px">${range(t.start,t.end)} · ${(t.vehicleIds||[]).map(vName).map(esc).join(', ') || 'No vehicle'}</div></div>
+          <div class="muted" style="font-size:13px">${range(t.start,t.end)} · ${(t.vehicleIds||[]).map(vName).map(esc).join(', ') || 'No vehicle'}</div>${times(t)?`<div class="muted" style="font-size:12px">${esc(times(t))}</div>`:''}</div>
           <span class="chip ${t.start<=d?'busy':'pending'}">${tripState(t)}</span></div>`).join('')}</div>`
         : '<div class="empty">No tours in the next 30 days.</div>'}
     </section>
@@ -526,7 +528,7 @@ function vTours(){
   <div class="tablebox"><table>
     <thead><tr><th>Dates</th><th>Customer / group</th><th>Vehicles</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th><th>Payment</th></tr></thead>
     <tbody>${ts.length ? ts.map(t => `<tr class="click" data-act="editTour" data-id="${t.id}">
-      <td class="mono" style="white-space:nowrap">${range(t.start,t.end)}<div class="muted" style="font-size:12px;font-family:var(--body)">${tripState(t)} · ${t.start&&t.end?daysBetween(t.start,t.end)+1:'?'} days</div></td>
+      <td class="mono" style="white-space:nowrap">${range(t.start,t.end)}<div class="muted" style="font-size:12px;font-family:var(--body)">${tripState(t)} · ${t.start&&t.end?daysBetween(t.start,t.end)+1:'?'} days</div>${times(t)?`<div class="muted" style="font-size:12px;font-family:var(--body);white-space:normal">${esc(times(t))}</div>`:''}</td>
       <td><b style="font-weight:600">${esc(t.customer||'Unnamed')}</b>${exTag(t)}<div class="muted" style="font-size:12px">${t.pax?esc(t.pax)+' pax':''}${t.country?' · '+esc(t.country):''}</div></td>
       <td>${(t.vehicleIds||[]).map(id=>esc(vName(id))).join('<br>') || '<span class="muted">—</span>'}</td>
       <td class="num">${money(t.total)}</td><td class="num">${money(paidOf(t))}</td><td class="num">${money(Math.max(0,n(t.total)-paidOf(t)))}</td>
@@ -679,7 +681,9 @@ function sheetTour(){
       <div class="fields">${fld('Customer or group name','customer','text','placeholder="Müller family"')}${fld('Number of people','pax','number','min="1"')}${fld('Country','country')}${fld('Phone / WhatsApp','phone','tel')}${fld('Email','email','email')}</div>
     </section>
     <section class="sec"><div class="spread"><h3>Tour dates</h3>${days>0?`<span class="muted">${days} days, ${days-1} nights</span>`:''}</div>
-      <div class="fields">${fld('Start date','start','date')}${fld('End date','end','date')}${fld('Pick-up place','pickup','text','placeholder="BIA Katunayake"')}${fld('Drop-off place','dropoff')}${fld('Driver / guide','guide')}</div>
+      <div class="fields">${fld('Start date','start','date')}${fld('Arrival time','arrTime','time')}${fld('Arrival flight','arrFlight','text','placeholder="UL 504"')}</div>
+      <div class="fields">${fld('End date','end','date')}${fld('Departure time','depTime','time')}${fld('Departure flight','depFlight','text','placeholder="EK 651"')}</div>
+      <div class="fields">${fld('Pick-up place','pickup','text','placeholder="BIA Katunayake"')}${fld('Drop-off place','dropoff')}${fld('Driver / guide','guide')}</div>
       ${t.start && t.end && t.end < t.start ? '<div class="warnbox">The end date is before the start date.</div>':''}
     </section>
     <section class="sec"><h3>Vehicles</h3>
@@ -720,7 +724,7 @@ function sheetTour(){
 }
 
 function itinText(t){
-  const lines = [`${t.customer||'Tour'} · ${range(t.start,t.end)}`, t.pax?`${t.pax} people`:'', (t.vehicleIds||[]).length?'Vehicle: '+t.vehicleIds.map(vName).join(', '):'', t.guide?'Driver/guide: '+t.guide:'', ''];
+  const lines = [`${t.customer||'Tour'} · ${range(t.start,t.end)}`, times(t), [t.pickup?'Pick-up: '+t.pickup:'', t.dropoff?'Drop-off: '+t.dropoff:''].filter(Boolean).join(' · '), t.pax?`${t.pax} people`:'', (t.vehicleIds||[]).length?'Vehicle: '+t.vehicleIds.map(vName).join(', '):'', t.guide?'Driver/guide: '+t.guide:'', ''];
   (t.itinerary||[]).forEach((d,i)=>{
     lines.push(`Day ${i+1}${d.date?' ('+WD[parse(d.date).getDay()]+' '+fmtDY(d.date)+')':''}: ${d.route||''}${d.km?' · '+d.km+' km':''}`);
     if (d.activities) lines.push('  '+d.activities.replace(/\n/g,'\n  '));
