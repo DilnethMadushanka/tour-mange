@@ -158,6 +158,59 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--sunk)}
 .mstats div{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .mstats b{display:block;font-family:var(--mono);font-size:17px;font-weight:500;color:var(--fg);text-transform:none;letter-spacing:0}
 @media (max-width:640px){ .wk{min-height:74px} .bar{font-size:10px;padding:1px 4px;margin:1px} .bar .veh{display:none} .cell{padding:2px 3px} .cal-dow div{padding:4px 3px;font-size:10px} }
+nav.tabs a{display:flex;align-items:center;gap:7px}
+nav.tabs a .sm{display:none}
+.agenda{display:none}
+@media (max-width:640px){
+  body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .brand small{display:none}
+  .topbar{gap:8px;padding-block:8px}
+  .topbar > .row{width:100%;flex-wrap:nowrap}
+  .topbar > .row select{flex:1;max-width:none!important}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+  nav.tabs a{flex-direction:column;gap:2px;padding:8px 2px 7px;font-size:11px;border-bottom:0;border-top:2px solid transparent;justify-content:center}
+  nav.tabs a[aria-current="page"]{border-color:var(--road);color:var(--accent)}
+  nav.tabs a .lg{display:none} nav.tabs a .sm{display:inline}
+  main{padding-block:14px 24px;gap:14px}
+  .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  input,select,textarea{font-size:16px}
+  .panel{padding:14px}
+  .stats{grid-template-columns:1fr 1fr;gap:8px}
+  .stats .stat:last-child:nth-child(odd){grid-column:1 / -1}
+  .stat b{font-size:17px}
+  .grid2{grid-template-columns:minmax(0,1fr)}
+  /* tables become cards */
+  .tablebox{border:0;background:none;overflow:visible}
+  .tablebox table{min-width:0;display:block}
+  .tablebox thead{display:none}
+  .tablebox tbody{display:grid;gap:10px}
+  .tablebox tr{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+  .tablebox td{border:0;padding:0;text-align:left;min-width:0}
+  .tablebox td[data-label]::before{content:attr(data-label);display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-family:var(--body)}
+  .tablebox td:nth-child(1),.tablebox td:nth-child(2){grid-column:1 / -1}
+  .tablebox td:nth-child(2)::before{display:none!important}
+  .tablebox tr.click:hover td{background:none}
+  .tablebox td.num{text-align:left}
+  .tablebox td[colspan]{grid-column:1 / -1}
+  .tablebox td[colspan]::before{display:none}
+  .cal-head .row{width:100%}
+  .cal-head .row select{flex:1 1 100%}
+  .cal-nav{flex:1}
+  .cal-title{font-size:20px}
+  .mstats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .wk{min-height:58px}
+  .bar{height:14px;padding:0 3px;font-size:9px;line-height:14px}
+  .agenda{display:grid}
+  .cal-grid{min-width:0}
+  .cal-dow div{text-align:center}
+  #fQ{max-width:none!important}
+  .sheet-head{padding:10px 14px}
+  .sheet-head h2{font-size:16px}
+  .sheet-body{padding:14px;gap:16px}
+  .vpick{grid-template-columns:1fr}
+  .day .fields{grid-template-columns:1fr 1fr}
+}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;z-index:40;font-size:13px}
 @media (max-width:620px){ .line{grid-template-columns:1fr 1fr} .line > :last-child{grid-column:1 / -1;justify-self:end} }
 @media (prefers-reduced-motion:no-preference){ .sheet.anim{animation:slide .18s ease-out} @keyframes slide{from{transform:translateX(24px);opacity:.6}} }
@@ -177,10 +230,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--sunk)}
       </div>
     </div>
     <nav class="tabs" id="tabs">
-      <a href="#overview" data-v="overview">Calendar</a>
-      <a href="#tours" data-v="tours">Tours &amp; payments</a>
-      <a href="#availability" data-v="availability">Availability</a>
-      <a href="#vehicles" data-v="vehicles">Vehicles</a>
+      <a href="#overview" data-v="overview"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 5h14v12H3zM3 9h14M7 3v4M13 3v4"/></svg>Calendar</a>
+      <a href="#tours" data-v="tours"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 4h12v13H4zM7 8h6M7 11h6M7 14h3"/></svg><span class="lg">Tours &amp; payments</span><span class="sm">Tours</span></a>
+      <a href="#availability" data-v="availability"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6v4l3 2"/></svg>Availability</a>
+      <a href="#vehicles" data-v="vehicles"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 13h14M5 13l2-5h6l2 5M3 13v3h2M15 16h2v-3"/><circle cx="6.5" cy="15.5" r="1.3"/><circle cx="13.5" cy="15.5" r="1.3"/></svg>Vehicles</a>
     </nav>
   </div>
 </header>
@@ -384,6 +437,7 @@ function monthCalendar(){
       <div class="cal-dow">${dows.map((d,i)=>`<div class="${i>4?'we':''}">${d}</div>`).join('')}</div>
       ${html}
     </div></div>
+    ${inMonth.length ? `<div class="list agenda">${inMonth.map(t=>`<div><div><button class="link" data-act="editTour" data-id="${t.id}">${esc(t.customer||'Tour')}</button><div class="muted" style="font-size:12px">${range(t.start,t.end)} · ${(t.vehicleIds||[]).map(vName).map(esc).join(', ')||'No vehicle'}</div></div>${payChip(t)}</div>`).join('')}</div>` : ''}
     <div class="spread"><div class="legend"><span><i style="background:var(--ok)"></i>Paid</span><span><i style="background:var(--warn)"></i>Partly paid</span><span><i style="background:var(--busy)"></i>Pending</span><span><i style="background:var(--bad)"></i>Overdue</span></div>
       <span class="muted" style="font-size:12px">Click a day to add a tour. Click a bar to open it.</span></div>
   </section>`;
@@ -525,7 +579,7 @@ function vVehicles(){
 }
 
 /* ---------- sheets (editors) ---------- */
-function openSheet(kind, data){ draftKind = kind; draft = data; renderSheet(); $('.sheet').classList.add('anim'); $('.sheet').scrollTop = 0; $('.sheet input:not([type=checkbox])')?.focus({preventScroll:true}); }
+function openSheet(kind, data){ draftKind = kind; draft = data; renderSheet(); $('.sheet').classList.add('anim'); $('.sheet').scrollTop = 0; if (!matchMedia('(pointer:coarse)').matches) $('.sheet input:not([type=checkbox])')?.focus({preventScroll:true}); }
 function closeSheet(){ draft = null; draftKind = null; $('#sheetRoot').innerHTML = ''; }
 function renderSheet(){
   if (!draft) return;
@@ -764,7 +818,8 @@ $('#signOut').addEventListener('click', () => auth && auth.signOut());
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && draft) closeSheet(); });
 // keep filter selects showing current values after re-render
 const _render = render;
-render = function(){ _render(); const w = $('#fWhen'); if (w) w.value = ui.tourWhen; const p = $('#fPay'); if (p) p.value = ui.tourFilter; };
+render = function(){ _render();
+  document.querySelectorAll('.tablebox table').forEach(tb => { const hs = [...tb.querySelectorAll('thead th')].map(th=>th.textContent.trim()); tb.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td,i)=>{ if (!td.hasAttribute('colspan') && hs[i]) td.dataset.label = hs[i]; })); }); const w = $('#fWhen'); if (w) w.value = ui.tourWhen; const p = $('#fPay'); if (p) p.value = ui.tourFilter; };
 
 setView();
 boot();
