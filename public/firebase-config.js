@@ -1,10 +1,9 @@
-// Paste your Firebase web app settings here.
-// Firebase console > Project settings > General > Your apps > Web app > "SDK setup and configuration" > Config
+// Firebase web app settings (these are safe to publish; security comes from firestore.rules).
 window.FIREBASE_CONFIG = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:0000000000000000"
+  apiKey: "AIzaSyDd-yMcsZTWxAIGApDwt1FGNpF7KnGXDBU",
+  authDomain: "tour-manage-3ef28.firebaseapp.com",
+  projectId: "tour-manage-3ef28",
+  storageBucket: "tour-manage-3ef28.firebasestorage.app",
+  messagingSenderId: "289580318744",
+  appId: "1:289580318744:web:9ab5361a0f2cf0f14a036d"
 };
