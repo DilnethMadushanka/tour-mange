@@ -245,7 +245,7 @@ nav.tabs a .sm{display:none}
 'use strict';
 const COLS = ['companies','vehicles','tours'];
 const S = { companies:{}, vehicles:{}, tours:{} };
-let db = null, auth = null, user = null, unsubs = [], mode = 'loading', loaded = {companies:false,vehicles:false,tours:false};
+let db = null, auth = null, user = null, unsubs = [], subCo = {}, invites = {}, mode = 'loading', loaded = {companies:false,vehicles:false,tours:false};
 let view = 'overview', companyId = null, draft = null, draftKind = null;
 const ui = { calMonth:null, calVeh:'', tourFilter:'all', tourWhen:'upcoming', tourQ:'', avFrom:null, avTo:null, avType:'' };
 
@@ -273,15 +273,22 @@ const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch {
 const lsSet = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 /* ---------- store ---------- */
+const docRef = (col, id, data) => col === 'companies' ? db.collection('companies').doc(id) : db.collection('companies').doc(data.companyId).collection(col).doc(id);
+const myEmail = () => (user?.email || '').toLowerCase();
+const isOwner = cid => !db || S.companies[cid]?.ownerId === user?.uid;
 async function save(col, id, data){
   S[col][id] = data; render();
-  if (db) { try { await db.collection(col).doc(id).set(data); } catch(e){ toast('Could not save: ' + (e?.message || e?.code || 'error')); } }
+  if (db) { try { await docRef(col, id, data).set(data); } catch(e){ toast('Could not save: ' + (e?.message || e?.code || 'error')); } }
   else lsSet('tfd-data', S);
 }
 async function remove(col, id){
-  delete S[col][id]; render();
-  if (db) { try { await db.collection(col).doc(id).delete(); } catch(e){ toast('Could not delete: ' + (e?.message || 'error')); } }
+  const data = S[col][id]; delete S[col][id]; render();
+  if (db && data) { try { await docRef(col, id, data).delete(); } catch(e){ toast('Could not delete: ' + (e?.message || 'error')); } }
   else lsSet('tfd-data', S);
+}
+async function coUpdate(cid, fields, okMsg){
+  try { await db.collection('companies').doc(cid).update(fields); if (okMsg) toast(okMsg); }
+  catch(e){ toast('Could not update: ' + (e?.message || e?.code)); }
 }
 async function boot(){
   render();
@@ -291,7 +298,7 @@ async function boot(){
     auth = firebase.auth();
     auth.onAuthStateChanged(u => {
       user = u;
-      if (!u) { mode = 'login'; unsubs.forEach(f=>f()); unsubs = []; COLS.forEach(c=>{S[c]={};loaded[c]=false;}); companyId = null; render(); return; }
+      if (!u) { mode = 'login'; unsubs.forEach(f=>f()); unsubs = []; Object.values(subCo).forEach(a=>a.forEach(f=>f())); subCo = {}; invites = {}; COLS.forEach(c=>{S[c]={};loaded[c]=false;}); companyId = null; render(); return; }
       db = firebase.firestore(); mode = 'loading'; render(); subscribe();
     });
     return;
@@ -306,14 +313,29 @@ async function boot(){
 }
 function subscribe(){
   mode = 'shared';
-  const timer = setTimeout(() => { if (!COLS.every(c=>loaded[c])) { mode = 'slow'; render(); } }, 10000);
-  COLS.forEach(c => {
-    unsubs.push(db.collection(c).onSnapshot(snap => {
-      const next = {}; snap.docs.forEach(d => next[d.id] = d.data()); S[c] = next; loaded[c] = true;
-      if (COLS.every(k=>loaded[k])) { clearTimeout(timer); if (mode==='slow') mode='shared'; }
-      pickCompany(); render();
-    }, err => { loaded[c] = true; if (err?.code === 'permission-denied') { mode = 'denied'; render(); return; } toast('Could not load ' + c + ': ' + (err?.message || err?.code)); render(); }));
-  });
+  const timer = setTimeout(() => { if (!loaded.companies) { mode = 'slow'; render(); } }, 10000);
+  const dropCo = (col, cid) => Object.keys(S[col]).forEach(id => { if (S[col][id].companyId === cid) delete S[col][id]; });
+  unsubs.push(db.collection('companies').where('members', 'array-contains', user.uid).onSnapshot({includeMetadataChanges: true}, snap => {
+    const mine = {}, pending = new Set(); snap.docs.forEach(d => { mine[d.id] = d.data(); if (d.metadata.hasPendingWrites) pending.add(d.id); });
+    S.companies = mine; loaded.companies = true; clearTimeout(timer); if (mode === 'slow') mode = 'shared';
+    Object.keys(subCo).forEach(cid => { if (!mine[cid]) { subCo[cid].forEach(f=>f()); delete subCo[cid]; dropCo('vehicles', cid); dropCo('tours', cid); } });
+    const listen = (cid, tries) => {
+      subCo[cid] = ['vehicles','tours'].map(col => db.collection('companies').doc(cid).collection(col).onSnapshot(sn => {
+        dropCo(col, cid); sn.docs.forEach(d => S[col][d.id] = {...d.data(), companyId: cid}); loaded[col] = true; render();
+      }, err => {
+        // Access can lag a moment behind joining or creating a company: try again shortly.
+        if (subCo[cid]) { subCo[cid].forEach(f=>f()); delete subCo[cid]; }
+        if (tries < 4 && S.companies[cid]) setTimeout(() => { if (S.companies[cid] && !subCo[cid]) listen(cid, tries+1); }, 1500 * (tries+1));
+        else toast('Could not load ' + col + ': ' + (err?.message || err?.code));
+      }));
+    };
+    Object.keys(mine).forEach(cid => { if (!subCo[cid] && !pending.has(cid)) listen(cid, 0); });
+    if (!Object.keys(mine).length) { loaded.vehicles = loaded.tours = true; }
+    pickCompany(); render(); if (draftKind === 'company') renderSheet();
+  }, err => { loaded.companies = true; toast('Could not load companies: ' + (err?.message || err?.code)); render(); }));
+  if (myEmail()) unsubs.push(db.collection('companies').where('invites', 'array-contains', myEmail()).onSnapshot(snap => {
+    invites = {}; snap.docs.forEach(d => { if (!(d.data().members||[]).includes(user.uid)) invites[d.id] = d.data(); }); render();
+  }, () => {}));
 }
 function pickCompany(){
   if (companyId && S.companies[companyId]) return;
@@ -365,6 +387,8 @@ function render(){
   if (mode === 'denied') { m.innerHTML = noAccessView(); return; }
   if (mode === 'local') banner = '<div class="banner">Firebase is not set up yet, so data is saved in this browser only. Add your Firebase settings to firebase-config.js.</div>';
   if (mode === 'slow') banner = '<div class="banner">Still waiting for saved data. Check your connection; the page will update when it arrives.</div>';
+  const inv = Object.entries(invites);
+  if (inv.length) banner += inv.map(([cid,c]) => `<div class="panel spread"><div>You are invited to join <b>${esc(c.name)}</b>${c.memberInfo?.[c.ownerId] ? ' by ' + esc(c.memberInfo[c.ownerId]) : ''}.</div><button class="primary small" data-act="joinCo" data-id="${cid}">Join company</button></div>`).join('');
   if (!companyId) { m.innerHTML = banner + noCompany(); return; }
   const body = { overview:vOverview, tours:vTours, availability:vAvail, vehicles:vVehicles }[view]();
   m.innerHTML = banner + body;
@@ -372,7 +396,7 @@ function render(){
 
 function loginView(){
   return `<div class="panel" style="max-width:400px;margin:40px auto;width:100%"><div class="sec">
-    <h2>Sign in</h2><p class="muted" style="margin:0">Sign in with the Google account your company uses. Only approved accounts can see the data.</p>
+    <h2>Sign in</h2><p class="muted" style="margin:0">Sign in with your Google account. New here? Signing in creates your account, then you can add your company.</p>
     <div id="lgErr" class="warnbox" hidden></div>
     <button class="primary" data-act="google" style="display:flex;gap:10px;align-items:center;justify-content:center">
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
@@ -595,12 +619,26 @@ function head(title, canDelete){
     <button data-act="close">Cancel</button><button class="primary" data-act="saveDraft">Save</button></div></div>`;
 }
 
+function teamSection(){
+  if (!db || !draft._id) return '';
+  const c = S.companies[draft._id]; if (!c) return '';
+  const owner = c.ownerId === user?.uid;
+  const members = (c.members||[]).map(uid => ({uid, email: c.memberInfo?.[uid] || 'Team member', owner: uid === c.ownerId}));
+  return `<section class="sec"><h3 style="font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-family:var(--body);font-weight:600">Team</h3>
+    <div class="list">${members.map(m => `<div><div>${esc(m.email)}${m.uid===user.uid?' <span class="muted">(you)</span>':''}</div>
+      ${m.owner ? '<span class="chip paid">Owner</span>' : (owner ? `<button class="danger small" data-act="rmMember" data-id="${m.uid}">Remove</button>` : '<span class="chip pending">Member</span>')}</div>`).join('')}
+    ${(c.invites||[]).map(e => `<div><div>${esc(e)} <span class="muted">· invited, not joined yet</span></div>${owner ? `<button class="danger small" data-act="rmInvite" data-email="${esc(e)}">Cancel</button>` : ''}</div>`).join('')}</div>
+    ${owner ? `<div class="row" style="flex-wrap:nowrap"><input id="d-_invite" data-f="_invite" type="email" placeholder="staff.member@gmail.com" value="${esc(draft._invite||'')}"><button data-act="invite">Invite</button></div>
+      <div class="muted" style="font-size:12px">They sign in with that Google account and click Join company.</div>` : ''}
+  </section>`;
+}
 function sheetCompany(){
   const list = Object.entries(S.companies);
-  return head(draft._id ? 'Edit company' : 'Add company', !!draft._id) + `<div class="sheet-body">
+  return head(draft._id ? 'Edit company' : 'Add company', !!draft._id && isOwner(draft._id)) + `<div class="sheet-body">
     <div class="fields">${fld('Company name','name','text','required')}${fld('Phone','phone','tel')}${fld('Email','email','email')}${fld('Currency code','currency','text','maxlength="4" placeholder="LKR"')}</div>
+    ${teamSection()}
     ${list.length ? `<div class="sec"><div class="spread"><h3>Your companies</h3><button class="small" data-act="newCompany">Add another</button></div>
-      <div class="list">${list.map(([id,c])=>`<div><div><b style="font-weight:600">${esc(c.name)}</b>${exTag(c)}<div class="muted" style="font-size:12px">${Object.values(S.vehicles).filter(v=>v.companyId===id).length} vehicles · ${Object.values(S.tours).filter(t=>t.companyId===id).length} tours</div></div>
+      <div class="list">${list.map(([id,c])=>`<div><div><b style="font-weight:600">${esc(c.name)}</b>${exTag(c)}<div class="muted" style="font-size:12px">${db ? (c.ownerId===user?.uid ? 'Owner · ' : 'Member · ') : ''}${Object.values(S.vehicles).filter(v=>v.companyId===id).length} vehicles · ${Object.values(S.tours).filter(t=>t.companyId===id).length} tours</div></div>
       <button class="small" data-act="editCompany" data-id="${id}">Edit</button></div>`).join('')}</div></div>`:''}
   </div>`;
 }
@@ -697,7 +735,11 @@ function saveDraft(){
   if (draftKind === 'company') {
     if (!d.name?.trim()) return toast('Enter a company name');
     const id = d._id || uid(); d.currency = (d.currency||'LKR').toUpperCase().trim() || 'LKR';
-    save('companies', id, clean({...d, name:d.name.trim()})); companyId = id; lsSet('tfd-company', id); toast('Company saved');
+    const fields = {name:d.name.trim(), phone:d.phone||'', email:d.email||'', currency:d.currency};
+    if (db && d._id) { S.companies[id] = {...S.companies[id], ...fields}; coUpdate(id, fields); }
+    else if (db) save('companies', id, {...fields, ownerId:user.uid, members:[user.uid], memberInfo:{[user.uid]:myEmail()}, invites:[]});
+    else save('companies', id, clean({...d, name:d.name.trim()}));
+    companyId = id; lsSet('tfd-company', id); toast('Company saved');
   } else if (draftKind === 'vehicle') {
     if (!d.name?.trim()) return toast('Enter the vehicle name or model');
     save('vehicles', d._id || uid(), clean({...d, companyId: d.companyId || companyId})); toast('Vehicle saved');
@@ -713,7 +755,7 @@ function saveDraft(){
 /* ---------- sample data (local mode only) ---------- */
 function sampleData(){
   const c = uid(), t0 = today(), v = [uid(),uid(),uid(),uid()];
-  S.companies[c] = {name:'Example: Lanka Tour Wheels', currency:'LKR', phone:'077 000 0000', example:true};
+  S.companies[c] = {name:'Example: Lanka Tour Wheels', currency:'LKR', phone:'077 000 0000', example:true, ...(db ? {ownerId:user.uid, members:[user.uid], memberInfo:{[user.uid]:myEmail()}, invites:[]} : {})};
   [['Toyota KDH High Roof','WP PH-4521','Van',9,18000,'Nimal'],['Toyota Prius','CAR-7781','Car',3,12000,'Kasun'],['Toyota Coaster','NC-2290','Mini bus',26,32000,'Sunil'],['Suzuki Every','WP BHI-1203','Van',5,10000,'Ruwan']]
     .forEach(([name,plate,type,seats,rate,driver],i)=> S.vehicles[v[i]] = {companyId:c,name,plate,type,seats,rate,driver,example:true});
   const tours = [
@@ -725,7 +767,7 @@ function sampleData(){
   ];
   tours.forEach(t => S.tours[uid()] = {...t, companyId:c, example:true});
   companyId = c; lsSet('tfd-company', c);
-  if (db) { COLS.forEach(col => Object.entries(S[col]).forEach(([id,d]) => { if (d.companyId===c || id===c) db.collection(col).doc(id).set(d).catch(e=>toast('Could not save: '+e.message)); })); }
+  if (db) { docRef('companies', c, S.companies[c]).set(S.companies[c]).then(() => Promise.all(['vehicles','tours'].flatMap(col => Object.entries(S[col]).filter(([,d]) => d.companyId===c).map(([id,d]) => docRef(col,id,d).set(d))))).catch(e=>toast('Could not save: '+e.message)); }
   else lsSet('tfd-data', S);
   render();
 }
@@ -752,6 +794,14 @@ document.addEventListener('click', e => {
       });
       break; }
     case 'signOutBtn': auth && auth.signOut(); break;
+    case 'joinCo': { const FV = firebase.firestore.FieldValue;
+      coUpdate(id, {members: FV.arrayUnion(user.uid), invites: FV.arrayRemove(myEmail()), ['memberInfo.' + user.uid]: myEmail()}, 'You joined the company').then(() => { companyId = id; lsSet('tfd-company', id); });
+      break; }
+    case 'invite': { const e = (draft._invite||'').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return toast('Enter a valid email address');
+      coUpdate(draft._id, {invites: firebase.firestore.FieldValue.arrayUnion(e)}, 'Invite added. Ask them to sign in.'); draft._invite = ''; break; }
+    case 'rmInvite': coUpdate(draft._id, {invites: firebase.firestore.FieldValue.arrayRemove(el.dataset.email)}); break;
+    case 'rmMember': coUpdate(draft._id, {members: firebase.firestore.FieldValue.arrayRemove(id), ['memberInfo.' + id]: firebase.firestore.FieldValue.delete()}, 'Removed from team'); break;
     case 'newCompany': openSheet('company', {currency:'LKR'}); break;
     case 'editCompany': openSheet('company', {...S.companies[id], _id:id}); break;
     case 'loadSample': sampleData(); break;
@@ -765,7 +815,12 @@ document.addEventListener('click', e => {
     case 'del':
       if (!el.classList.contains('armed')) { el.classList.add('armed'); el.textContent = 'Click again to delete'; setTimeout(()=>{ if (el.isConnected){ el.classList.remove('armed'); el.textContent='Delete'; } }, 4000); return; }
       { const col = {tour:'tours',vehicle:'vehicles',company:'companies'}[draftKind], did = draft._id;
-        if (draftKind === 'company') { Object.entries(S.vehicles).filter(([,v])=>v.companyId===did).forEach(([vid])=>remove('vehicles',vid)); Object.entries(S.tours).filter(([,t])=>t.companyId===did).forEach(([tid])=>remove('tours',tid)); companyId = null; }
+        if (draftKind === 'company') {
+          const subs = [...Object.entries(S.vehicles).filter(([,v])=>v.companyId===did).map(([i])=>remove('vehicles',i)), ...Object.entries(S.tours).filter(([,t])=>t.companyId===did).map(([i])=>remove('tours',i))];
+          companyId = null; closeSheet();
+          Promise.all(subs).then(() => remove('companies', did)).then(() => { pickCompany(); render(); toast('Company deleted'); });
+          break;
+        }
         remove(col, did); pickCompany(); closeSheet(); render(); toast('Deleted'); }
       break;
     case 'addPay': draft.payments.push({date:today(), amount:'', method:'Cash', note:''}); renderSheet(); break;

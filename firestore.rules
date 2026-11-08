@@ -2,19 +2,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Google accounts that may use the system. Add your staff emails here,
-    // then run: firebase deploy --only firestore:rules
-    function isStaff() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email in [
-          'your.name@gmail.com'
-        ];
-    }
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
-    match /{collection}/{docId} {
-      allow read, write: if isStaff()
-        && collection in ['companies', 'vehicles', 'tours'];
+    // A company. Anyone signed in with Google can create one and becomes its owner.
+    // Only members (and people invited by email) can see it.
+    match /companies/{cid} {
+      allow read: if signedIn() && (
+        request.auth.uid in resource.data.members
+        || (request.auth.token.email_verified == true && myEmail() in resource.data.invites));
+
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.members == [request.auth.uid];
+
+      allow update: if signedIn() && (
+        // Owner can change anything except who owns it.
+        (request.auth.uid == resource.data.ownerId
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.auth.uid in request.resource.data.members)
+        // Members can edit the company details.
+        || (request.auth.uid in resource.data.members
+          && changed().hasOnly(['name', 'phone', 'email', 'currency']))
+        // An invited person can add only themselves when joining.
+        || (request.auth.token.email_verified == true
+          && myEmail() in resource.data.invites
+          && changed().hasOnly(['members', 'invites', 'memberInfo'])
+          && request.resource.data.members.toSet() == resource.data.members.toSet().union([request.auth.uid].toSet())
+          && request.resource.data.invites.toSet() == resource.data.invites.toSet().difference([myEmail()].toSet())));
+
+      allow delete: if signedIn() && request.auth.uid == resource.data.ownerId;
+
+      // Vehicles and tours belong to one company; only its members can use them.
+      match /{sub}/{docId} {
+        allow read, write: if signedIn()
+          && sub in ['vehicles', 'tours']
+          && request.auth.uid in get(/databases/$(database)/documents/companies/$(cid)).data.members;
+      }
     }
   }
 }
