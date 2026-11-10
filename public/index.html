@@ -258,6 +258,24 @@ nav.tabs a .sm{display:none}
 .paper .foot{margin-top:28px;padding-top:12px;border-top:1px solid #e1e7e5;text-align:center;color:#6a7673;font-size:11px}
 .paper .stamp{position:absolute;top:196px;right:48px;transform:rotate(-14deg);border:3px solid #1f7a3d;color:#1f7a3d;font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.12em;padding:2px 14px;border-radius:6px;opacity:.75}
 .paper .stamp.cx{border-color:#b3261e;color:#b3261e}
+.paper .intro{margin:18px 0 4px;white-space:pre-line;font-size:13px}
+.paper h4{font-family:var(--display);font-size:15px;margin:22px 0 8px;color:#0f6b5c}
+.paper .pdays{display:grid;gap:0;border-left:2px solid #c4791b;margin-left:4px}
+.paper .pday{padding:0 0 12px 16px;position:relative;break-inside:avoid}
+.paper .pday::before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:#c4791b}
+.paper .pday .dh{font-weight:600} .paper .pday .dh small{font-family:var(--mono);font-weight:400;color:#6a7673;margin-left:6px}
+.paper .pday p{margin:2px 0 0;white-space:pre-line;color:#33403d}
+.paper .pday .ht{font-size:12px;color:#6a7673;margin-top:2px}
+.paper .pvehs{display:grid;gap:6px}
+.paper .pveh{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;background:#eef3f1;border-radius:4px}
+.paper .pprice{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 16px;background:#0f6b5c;color:#fff;border-radius:6px;margin-top:20px;break-inside:avoid}
+.paper .pprice .big{font-family:var(--mono);font-size:22px;font-weight:500}
+.paper .pprice small{display:block;opacity:.85;font-size:12px}
+.paper .incl{display:grid;grid-template-columns:1fr 1fr;gap:20px;break-inside:avoid}
+.paper .incl ul{margin:0;padding:0;list-style:none;display:grid;gap:3px}
+.paper .incl li{padding-left:20px;position:relative}
+.paper .incl li::before{position:absolute;left:0;font-weight:700}
+.paper .incl .yes li::before{content:"✓";color:#1f7a3d} .paper .incl .no li::before{content:"✕";color:#b3261e}
 @media (max-width:900px){ .inv-wrap{grid-template-columns:minmax(0,1fr)} .inv-prev{display:inline-block} }
 @media (max-width:640px){
   .paper{padding:22px 18px;font-size:12px}
@@ -267,6 +285,7 @@ nav.tabs a .sm{display:none}
   .paper th,.paper td{padding:7px 4px;font-size:11px} .paper th{font-size:9px;letter-spacing:.04em}
   .inv-tools .lg{display:none} .inv-tools button{padding:7px 10px}
   .paper .stamp{top:auto;bottom:90px;right:16px;font-size:20px}
+  .paper .incl{grid-template-columns:1fr}
 }
 @page{size:A4;margin:12mm}
 @media print{
@@ -751,7 +770,7 @@ function sheetTour(){
       ${t.start&&t.end ? (b.length?` <span class="chip busy">Booked</span>`:` <span class="chip free">Free</span>`):''}</span></label>`;
   }).join('') : '<div class="muted">No vehicles yet. Add vehicles in the Vehicles tab.</div>';
   const days = t.start && t.end ? daysBetween(t.start, t.end) + 1 : 0;
-  return head(t._id ? 'Edit tour' : 'New tour', !!t._id, `<button data-act="invOpen">${t.invoice?.no ? 'Invoice ' + esc(t.invoice.no) : 'Make invoice'}</button>`) + `<div class="sheet-body">
+  return head(t._id ? 'Edit tour' : 'New tour', !!t._id, `<button data-act="propOpen">${t.proposal?.no ? 'Proposal' : 'Make proposal'}</button><button data-act="invOpen">${t.invoice?.no ? 'Invoice ' + esc(t.invoice.no) : 'Make invoice'}</button>`) + `<div class="sheet-body">
     <section class="sec"><div class="spread"><h3>Customer / group</h3>
       <label class="row" style="font-size:13px;gap:6px"><input type="checkbox" id="d-cancelled" data-fc="cancelled" style="width:auto" ${t.cancelled?'checked':''}> Tour cancelled</label></div>
       <div class="fields">${fld('Customer or group name','customer','text','placeholder="Müller family"')}${fld('Number of people','pax','number','min="1"')}${fld('Country','country')}${fld('Phone / WhatsApp','phone','tel')}${fld('Email','email','email')}</div>
@@ -859,7 +878,7 @@ function readLogo(file){
 
 /* ---------- invoice ---------- */
 // The invoice lives on the tour (tour.invoice) and is edited through the open tour draft.
-let invOpen = false, invTitle = '';
+let invOpen = false, invTitle = '', docKind = 'invoice';   // docKind: which document the overlay shows
 const num2 = v => n(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 const money2 = v => cur() + ' ' + num2(v);
 function nextInvNo(){
@@ -884,7 +903,7 @@ function invCalc(t){
 function openInvoice(){
   const t = draft;
   if (!t.invoice) t.invoice = {no: nextInvNo(), date: today(), due: t.dueDate || today(), items: invDefaultItems(t), taxPct: '', note: ''};
-  invOpen = true; renderInvoice(); $('.inv-layer').scrollTop = 0;
+  docKind = 'invoice'; invOpen = true; renderInvoice(); $('.inv-layer').scrollTop = 0;
 }
 function closeInvoice(){ invOpen = false; $('#invRoot').innerHTML = ''; renderSheet(); }
 function invPaper(){
@@ -926,14 +945,16 @@ function invCheck(){
   if (Math.abs(c.total - tp) < 0.005) return '';
   return `<div class="warnbox">The invoice total (${money2(c.total)}) is not the same as the tour price (${money2(tp)}). <button class="link" data-act="invUseTotal">Set the tour price to ${money2(c.total)}</button></div>`;
 }
+const docTools = () => `<div class="inv-tools"><div class="wrap">
+      <button data-act="invBack">‹ Back<span class="lg"> to tour</span></button>
+      <div class="row"><button class="inv-prev" data-act="invPrev">Preview</button><button data-act="invSave">Save</button><button class="primary" data-act="invPrint">Print / Save PDF</button></div>
+    </div></div>`;
 function renderInvoice(){
+  if (docKind === 'proposal') return renderProposal();
   const iv = draft.invoice, f = (label, key, type='text', extra='') => `<label class="f">${label}<input data-iv="${key}" type="${type}" value="${esc(iv[key]??'')}" ${extra}></label>`;
   const y = $('.inv-layer')?.scrollTop || 0;
   $('#invRoot').innerHTML = `<div class="inv-layer" role="dialog" aria-modal="true" aria-label="Invoice">
-    <div class="inv-tools"><div class="wrap">
-      <button data-act="invBack">‹ Back<span class="lg"> to tour</span></button>
-      <div class="row"><button class="inv-prev" data-act="invPrev">Preview</button><button data-act="invSave">Save</button><button class="primary" data-act="invPrint">Print / Save PDF</button></div>
-    </div></div>
+    ${docTools()}
     <div class="inv-wrap">
       <div class="inv-edit">
         <section class="panel sec"><h3>Invoice details</h3>
@@ -957,14 +978,102 @@ function renderInvoice(){
     </div></div>`;
   $('.inv-layer').scrollTop = y;
 }
-function refreshInvoice(){ const p = $('#invPaper'); if (p) p.innerHTML = invPaper(); const c = $('#invCheck'); if (c) c.innerHTML = invCheck(); }
+function refreshInvoice(){ const pr = docKind === 'proposal'; const p = $('#invPaper'); if (p) p.innerHTML = pr ? propPaper() : invPaper(); const c = $('#invCheck'); if (c) c.innerHTML = pr ? propCheck() : invCheck(); }
 function printInvoice(){
   if (!saveDraft(true)) return;
   invTitle = document.title;
-  document.title = ['Invoice', draft.invoice.no, draft.customer].filter(Boolean).join(' - ');
+  document.title = docKind === 'proposal' ? ['Tour proposal', draft.customer].filter(Boolean).join(' - ') : ['Invoice', draft.invoice.no, draft.customer].filter(Boolean).join(' - ');
   setTimeout(() => window.print(), 50);
 }
 window.addEventListener('afterprint', () => { if (invTitle) { document.title = invTitle; invTitle = ''; } });
+
+/* ---------- proposal (quotation) ---------- */
+// Lives on the tour (tour.proposal). Inclusions, exclusions and terms start from the company's last proposal.
+const lines = s => String(s||'').split('\n').map(x => x.replace(/^[\s•\-*✓✕]+/, '').trim()).filter(Boolean);
+function nextPropNo(){
+  const nums = toursOf().map(t => parseInt(String(t.proposal?.no||'').replace(/\D/g,''), 10)).filter(x => isFinite(x));
+  return 'PRO-' + String((nums.length ? Math.max(...nums) : 0) + 1).padStart(4, '0');
+}
+function openProposal(){
+  const t = draft;
+  if (!t.proposal) {
+    const last = toursOf().filter(x => x.proposal && x.id !== t._id).sort((a,b) => (b.updated||'').localeCompare(a.updated||''))[0]?.proposal;
+    const co = S.companies[companyId] || {};
+    t.proposal = {no: nextPropNo(), date: today(), validUntil: addDays(today(), 14), price: n(t.total) || '',
+      intro: `Dear ${t.customer || 'guest'},\nThank you for contacting ${co.name || 'us'}. Here is our proposal for your tour. We would be happy to change anything to suit you.`,
+      priceNote: last?.priceNote ?? 'Total for the whole group, for the vehicle and driver for all days shown.',
+      inclusions: last?.inclusions ?? 'Air-conditioned vehicle with an English-speaking driver\nFuel, highway tolls and parking\nDriver\'s meals and accommodation\nAirport pick-up and drop-off\nBottled water in the vehicle',
+      exclusions: last?.exclusions ?? 'Hotel accommodation\nEntrance tickets and safari jeeps\nMeals and drinks\nTips and personal expenses',
+      terms: last?.terms ?? 'An advance of 30% confirms the booking. The balance is paid on arrival.\nPrices may change if the route or dates change.'};
+  }
+  docKind = 'proposal'; invOpen = true; renderInvoice(); $('.inv-layer').scrollTop = 0;
+}
+function propCheck(){
+  const pv = n(draft.proposal.price), tp = n(draft.total);
+  if (!pv || Math.abs(pv - tp) < 0.005) return '';
+  return `<div class="warnbox">The proposal price (${money2(pv)}) is not the same as the tour price (${money2(tp)}). <button class="link" data-act="propUseTotal">Set the tour price to ${money2(pv)}</button></div>`;
+}
+function propPaper(){
+  const t = draft, pv = t.proposal, co = S.companies[companyId] || {};
+  const days = t.start && t.end ? daysBetween(t.start, t.end) + 1 : 0;
+  const vs = (t.vehicleIds||[]).map(id => S.vehicles[id]).filter(Boolean);
+  const it = (t.itinerary||[]).filter(d => d.route || d.activities || d.hotel);
+  const km = (t.itinerary||[]).reduce((s,d) => s + n(d.km), 0);
+  const kv = (k, v) => v ? `<span>${k}</span><div>${esc(v)}</div>` : '';
+  const price = n(pv.price), pax = n(t.pax), inc = lines(pv.inclusions), exc = lines(pv.exclusions);
+  return `
+    <div class="ph">
+      <div>${co.logo ? `<img class="logo" src="${esc(co.logo)}" alt="">` : ''}<div class="co">${esc(co.name||'Your company')}</div>
+        <div class="co-d">${esc([co.address, [co.phone, co.email].filter(Boolean).join(' · ')].filter(Boolean).join('\n'))}</div></div>
+      <div class="tt"><h2>PROPOSAL</h2>
+        <div class="meta"><span>Reference</span><b>${esc(pv.no||'—')}</b><span>Date</span><b>${fmtDY(pv.date)}</b><span>Valid until</span><b>${fmtDY(pv.validUntil)}</b></div></div>
+    </div>
+    ${pv.intro ? `<p class="intro">${esc(pv.intro)}</p>` : ''}
+    <div class="blocks">
+      <div><div class="lbl">Prepared for</div><b>${esc(t.customer||'—')}</b>
+        <div class="kv" style="margin-top:4px">${kv('Country', t.country)}${kv('People', t.pax ? t.pax + ' pax' : '')}${kv('Phone', t.phone)}${kv('Email', t.email)}</div></div>
+      <div><div class="lbl">Your tour</div><b>${range(t.start,t.end)}</b>${days?` <span style="color:#6a7673">· ${days} days, ${days-1} nights</span>`:''}
+        <div class="kv" style="margin-top:4px">${kv('Arrival', [t12(t.arrTime), t.arrFlight].filter(Boolean).join(' · '))}${kv('Departure', [t12(t.depTime), t.depFlight].filter(Boolean).join(' · '))}${kv('Pick-up', t.pickup)}${kv('Drop-off', t.dropoff)}${kv('Distance', km ? 'about ' + km.toLocaleString() + ' km' : '')}</div></div>
+    </div>
+    ${vs.length ? `<h4>Vehicle</h4><div class="pvehs">${vs.map(v => `<div class="pveh"><span><b style="font-weight:600">${esc(v.name)}</b>${v.type?' · '+esc(v.type):''}</span><span style="color:#55625f">${v.seats?esc(v.seats)+' seats':''}${v.driver?(v.seats?' · ':'')+'Driver: '+esc(v.driver):''}</span></div>`).join('')}</div>` : ''}
+    ${it.length ? `<h4>Day-by-day plan</h4><div class="pdays">${it.map(d => { const i = t.itinerary.indexOf(d); return `<div class="pday">
+      <div class="dh">Day ${i+1}${d.route ? ': ' + esc(d.route) : ''}<small>${d.date ? WD[parse(d.date).getDay()] + ' ' + fmtDY(d.date) : ''}${d.km ? ' · ' + esc(d.km) + ' km' : ''}</small></div>
+      ${d.activities ? `<p>${esc(d.activities)}</p>` : ''}${d.hotel ? `<div class="ht">Night: ${esc(d.hotel)}</div>` : ''}</div>`; }).join('')}</div>` : ''}
+    <div class="pprice"><div><small>Tour price</small><div class="big">${price ? money2(price) : 'On request'}</div>${pv.priceNote ? `<small>${esc(pv.priceNote)}</small>` : ''}</div>
+      ${price && pax > 1 ? `<div style="text-align:right"><small>Per person (${esc(pax)} people)</small><div class="mono" style="font-size:16px">${money2(price / pax)}</div></div>` : ''}</div>
+    ${inc.length || exc.length ? `<div class="incl" style="margin-top:20px">
+      ${inc.length ? `<div class="yes"><div class="lbl">Included</div><ul>${inc.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '<div></div>'}
+      ${exc.length ? `<div class="no"><div class="lbl">Not included</div><ul>${exc.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}</div>` : ''}
+    <div class="notes">
+      ${pv.terms ? `<div><div class="lbl">Booking terms</div><p>${esc(pv.terms)}</p></div>` : ''}
+      ${co.invoiceNote ? `<div><div class="lbl">Payment details</div><p>${esc(co.invoiceNote)}</p></div>` : ''}
+    </div>
+    <div class="foot">To confirm this tour, reply to this proposal${co.phone ? ' or call ' + esc(co.phone) : ''}. We look forward to welcoming you.</div>`;
+}
+function renderProposal(){
+  const pv = draft.proposal, y = $('.inv-layer')?.scrollTop || 0;
+  const f = (label, key, type='text', extra='') => `<label class="f">${label}<input data-pv="${key}" type="${type}" value="${esc(pv[key]??'')}" ${extra}></label>`;
+  const ta = (label, key, rows=4, hint='') => `<label class="f">${label}<textarea data-pv="${key}" rows="${rows}">${esc(pv[key]||'')}</textarea>${hint?`<span style="font-weight:400">${hint}</span>`:''}</label>`;
+  const nIt = (draft.itinerary||[]).filter(d => d.route || d.activities || d.hotel).length;
+  $('#invRoot').innerHTML = `<div class="inv-layer" role="dialog" aria-modal="true" aria-label="Proposal">
+    ${docTools()}
+    <div class="inv-wrap">
+      <div class="inv-edit">
+        <section class="panel sec"><h3>Proposal details</h3>
+          <div class="fields">${f('Reference','no')}${f('Date','date','date')}${f('Valid until','validUntil','date')}${f('Price ('+esc(cur())+')','price','number','min="0" step="any"')}</div>
+          ${f('Price note','priceNote')}
+          <div id="invCheck">${propCheck()}</div>
+        </section>
+        <section class="panel sec"><h3>Message</h3>${ta('Opening message','intro',4)}</section>
+        <section class="panel sec"><h3>What's included</h3>
+          ${ta('Included','inclusions',5,'One item per line.')}${ta('Not included','exclusions',4,'One item per line.')}${ta('Booking terms','terms',3)}
+        </section>
+        <div class="muted" style="font-size:12px;padding:0 4px">${nIt ? `The day-by-day plan comes from the tour's itinerary (${nIt} day${nIt===1?'':'s'}).` : 'Tip: add days in the tour\'s <b>Itinerary</b> section to show a day-by-day plan here.'} Vehicles and dates come from the tour. Your logo and contact details come from <b>Companies › Edit</b>.</div>
+      </div>
+      <div class="paper" id="invPaper">${propPaper()}</div>
+    </div></div>`;
+  $('.inv-layer').scrollTop = y;
+}
 
 /* ---------- sample data (local mode only) ---------- */
 function sampleData(){
@@ -1027,6 +1136,8 @@ document.addEventListener('click', e => {
     case 'close': closeSheet(); break;
     case 'saveDraft': saveDraft(); break;
     case 'invOpen': openInvoice(); break;
+    case 'propOpen': openProposal(); break;
+    case 'propUseTotal': draft.total = n(draft.proposal.price); refreshInvoice(); toast('Tour price updated. Save to keep it.'); break;
     case 'rmLogo': draft.logo = ''; renderSheet(); break;
     case 'invBack': closeInvoice(); break;
     case 'invPrev': $('#invPaper').scrollIntoView({behavior:'smooth'}); break;
@@ -1070,9 +1181,10 @@ document.addEventListener('click', e => {
 
 document.addEventListener('input', e => {
   const el = e.target;
-  if (invOpen && draft?.invoice && el.closest('#invRoot')) {
+  if (invOpen && draft && el.closest('#invRoot')) {
     const v = el.type === 'number' ? (el.value === '' ? '' : +el.value) : el.value;
-    if (el.dataset.iv) draft.invoice[el.dataset.iv] = v;
+    if (el.dataset.pv) draft.proposal[el.dataset.pv] = v;
+    else if (el.dataset.iv) draft.invoice[el.dataset.iv] = v;
     else if (el.dataset.il) draft.invoice.items[+el.dataset.il][el.dataset.k] = v;
     refreshInvoice(); return;
   }
