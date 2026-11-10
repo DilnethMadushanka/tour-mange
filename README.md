@@ -9,6 +9,7 @@ A web app for tourism vehicle rental companies.
 - **Tours & payments**: customer or group, tour dates, vehicles, total price, due date and every payment received. It warns you when a vehicle is double-booked.
 - **Availability**: pick a date range to see which vehicles are free, plus a day-by-day chart.
 - **Itinerary**: one entry per day (route, places, hotel, km). "Copy as text" copies it for WhatsApp or email.
+- **Invoices**: open a tour and click *Make invoice*. Invoice numbers (INV-0001, INV-0002…) are given automatically, items are filled in from the tour (edit, add a discount line or VAT %), and payments already received are shown with the balance due. *Print / Save PDF* prints it or saves a PDF to send by WhatsApp or email. Add your address and bank details under Companies > Edit so they appear on every invoice.
 
 It is a single HTML page that uses Firebase for Google sign-in (Firebase Auth) and the database (Cloud Firestore).
 
