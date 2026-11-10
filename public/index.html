@@ -725,13 +725,13 @@ function teamSection(){
 function sheetCompany(){
   const list = Object.entries(S.companies);
   return head(draft._id ? 'Edit company' : 'Add company', !!draft._id && isOwner(draft._id)) + `<div class="sheet-body">
-    <div class="fields">${fld('Company name','name','text','required')}${fld('Phone','phone','tel')}${fld('Email','email','email')}${fld('Currency code','currency','text','maxlength="4" placeholder="LKR"')}</div>
+    <div class="fields">${fld('Company name','name','text','required')}${fld('Phone','phone','tel')}${fld('Email','email','email')}${fld('Currency code','currency','text','maxlength="4" placeholder="LKR"')}${fld('Website','website','url','placeholder="www.yourcompany.lk"')}</div>
     <div class="f" style="display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500">Logo (shown on invoices and at the top of the app)
       <div class="logo-box">${draft.logo ? `<img src="${esc(draft.logo)}" alt="Company logo">` : '<span class="muted">No logo yet</span>'}
         <div class="row"><label class="btn small" style="padding:4px 8px;font-size:13px">${draft.logo ? 'Change logo' : 'Upload logo'}<input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label>
         ${draft.logo ? '<button class="danger small" data-act="rmLogo">Remove</button>' : ''}</div></div>
       <span style="font-weight:400">PNG with a transparent background looks best. It is resized automatically.</span></div>
-    <label class="f">Address (shown on invoices)<textarea data-f="address" id="d-address" placeholder="No. 12, Lake Road, Negombo">${esc(draft.address||'')}</textarea></label>
+    <label class="f">Address / location (shown on invoices and proposals)<textarea data-f="address" id="d-address" placeholder="No. 12, Lake Road, Negombo">${esc(draft.address||'')}</textarea></label>
     <label class="f">Invoice footer: bank details, terms<textarea data-f="invoiceNote" id="d-invoiceNote" placeholder="Bank: BOC, Negombo · Acc: 0000000 · Name: …">${esc(draft.invoiceNote||'')}</textarea></label>
     ${teamSection()}
     ${list.length ? `<div class="sec"><div class="spread"><h3>Your companies</h3><button class="small" data-act="newCompany">Add another</button></div>
@@ -834,7 +834,7 @@ function saveDraft(keep){
   if (draftKind === 'company') {
     if (!d.name?.trim()) return toast('Enter a company name');
     const id = d._id || uid(); d.currency = (d.currency||'LKR').toUpperCase().trim() || 'LKR';
-    const fields = {name:d.name.trim(), phone:d.phone||'', email:d.email||'', currency:d.currency, address:d.address||'', invoiceNote:d.invoiceNote||'', logo:d.logo||''};
+    const fields = {name:d.name.trim(), phone:d.phone||'', email:d.email||'', currency:d.currency, address:d.address||'', website:(d.website||'').trim(), invoiceNote:d.invoiceNote||'', logo:d.logo||''};
     if (db && d._id) { S.companies[id] = {...S.companies[id], ...fields}; coUpdate(id, fields); }
     else if (db) save('companies', id, {...fields, ownerId:user.uid, members:[user.uid], memberInfo:{[user.uid]:myEmail()}, invites:[]});
     else save('companies', id, clean({...d, name:d.name.trim()}));
@@ -877,6 +877,9 @@ function readLogo(file){
 }
 
 /* ---------- invoice ---------- */
+// Company address, phone, email and website under the name on invoices and proposals.
+const coContact = co => { const web = String(co.website||'').trim().replace(/^https?:\/\//i,'').replace(/\/$/,'');
+  return `<div class="co-d">${esc([co.address, [co.phone, co.email].filter(Boolean).join(' · '), web].filter(Boolean).join('\n'))}</div>`; };
 // The invoice lives on the tour (tour.invoice) and is edited through the open tour draft.
 let invOpen = false, invTitle = '', docKind = 'invoice';   // docKind: which document the overlay shows
 const num2 = v => n(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -915,7 +918,7 @@ function invPaper(){
   return `${stamp}
     <div class="ph">
       <div>${co.logo ? `<img class="logo" src="${esc(co.logo)}" alt="">` : ''}<div class="co">${esc(co.name||'Your company')}</div>
-        <div class="co-d">${esc([co.address, [co.phone, co.email].filter(Boolean).join(' · ')].filter(Boolean).join('\n'))}</div></div>
+        ${coContact(co)}</div>
       <div class="tt"><h2>INVOICE</h2>
         <div class="meta"><span>Invoice no</span><b>${esc(iv.no||'—')}</b><span>Date</span><b>${fmtDY(iv.date)}</b><span>Due date</span><b>${fmtDY(iv.due)}</b></div></div>
     </div>
@@ -1024,7 +1027,7 @@ function propPaper(){
   return `
     <div class="ph">
       <div>${co.logo ? `<img class="logo" src="${esc(co.logo)}" alt="">` : ''}<div class="co">${esc(co.name||'Your company')}</div>
-        <div class="co-d">${esc([co.address, [co.phone, co.email].filter(Boolean).join(' · ')].filter(Boolean).join('\n'))}</div></div>
+        ${coContact(co)}</div>
       <div class="tt"><h2>PROPOSAL</h2>
         <div class="meta"><span>Reference</span><b>${esc(pv.no||'—')}</b><span>Date</span><b>${fmtDY(pv.date)}</b><span>Valid until</span><b>${fmtDY(pv.validUntil)}</b></div></div>
     </div>
